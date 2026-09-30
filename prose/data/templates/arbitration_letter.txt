@@ -1,0 +1,18 @@
+{{NOT_LEGAL_ADVICE}}
+
+{{DATE}}
+
+{{PARTY_NAME}}, pro se
+
+RE: Demand for Arbitration - {{PROGRAM}} ({{VIOLATION_ID}})
+
+To the Arbitration Administrator:
+
+I demand arbitration in accordance with the applicable arbitration clause.
+Alleged charges (auto-matched, confidence {{CONFIDENCE}}):
+{{EVIDENCE}}
+
+I request institution of arbitration and a confirmation of the appointed
+forum. This letter is a DRAFT for my own review before dispatch.
+
+    /s/ {{PARTY_NAME}} (pro se)

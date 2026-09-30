@@ -1,0 +1,112 @@
+[
+  {
+    "stage": "PRE_FILED",
+    "title": "Before you file",
+    "checklist": [
+      "Match the generated draft against the court's local rules and form checklist.",
+      "Verify party names, case number, and dates for accuracy.",
+      "Keep a signed copy and note the filing deadline."
+    ],
+    "caution": "Pre-prepared checklist only; verify deadlines with the clerk."
+  },
+  {
+    "stage": "FILED",
+    "title": "Filing confirmed",
+    "checklist": [
+      "Record the docket number and the court's service address.",
+      "Prepare and serve proof of service within the court's window.",
+      "Calendar the answer/response deadline for any cross-claim."
+    ],
+    "caution": "Docket confirmation from the clerk controls, not this outline."
+  },
+  {
+    "stage": "SERVICE",
+    "title": "Service of process",
+    "checklist": [
+      "Use a court-approved method (mail, sheriff, or certified server).",
+      "Keep the server's affidavit and all receipts.",
+      "File proof of service with the clerk promptly."
+    ],
+    "caution": "Defective service can restart deadlines; have it verified."
+  },
+  {
+    "stage": "ANSWER_DUE",
+    "title": "Answer due",
+    "checklist": [
+      "Review the complaint count by count before drafting your answer.",
+      "Admit, deny, or state lack of knowledge for each allegation.",
+      "Confirm the jurisdictional deadline; late answers waiver defenses."
+    ],
+    "caution": "An answer deadline is usually a hard cutoff - confirm with the clerk."
+  },
+  {
+    "stage": "ANSWERED",
+    "title": "Answer filed",
+    "checklist": [
+      "File the case management statement if the court requires one.",
+      "Calendar the initial hearing / scheduling order date.",
+      "Start the discovery file (requests, responses, productions)."
+    ],
+    "caution": "Scheduling orders vary by judge; local rules control."
+  },
+  {
+    "stage": "INITIAL_HEARING",
+    "title": "Initial hearing",
+    "checklist": [
+      "Arrive 30 minutes early with 3 copies of every required document.",
+      "Use the scripted objection prompts (HUD or mobile) for exam questions.",
+      "Speak only when addressed; do not argue with opposing counsel."
+    ],
+    "caution": "Courtroom electronics and conduct rules vary by judge and court."
+  },
+  {
+    "stage": "DISCOVERY",
+    "title": "Discovery",
+    "checklist": [
+      "Serve written discovery within the court-set window.",
+      "Log every request, response, and production with dates.",
+      "Document meet-and-confer attempts before filing disputes."
+    ],
+    "caution": "Missed discovery deadlines are grounds for sanctions."
+  },
+  {
+    "stage": "MOTIONS",
+    "title": "Motions",
+    "checklist": [
+      "File motions in local form with supporting citations to statute.",
+      "Attach a certificate of conferral where required.",
+      "Prepare a short oral argument outline (5 minutes max)."
+    ],
+    "caution": "Motions must cite local rules; verify the briefing schedule."
+  },
+  {
+    "stage": "TRIAL",
+    "title": "Trial day",
+    "checklist": [
+      "Prepare the case outline: opening, witnesses, exhibits, closing.",
+      "Bring the exhibit binder with a stamped index.",
+      "Rehearse the scripted objection prompts once with your device."
+    ],
+    "caution": "Many courts restrict electronics; confirm with the clerk beforehand."
+  },
+  {
+    "stage": "JUDGMENT",
+    "title": "Judgment entered",
+    "checklist": [
+      "Read the full judgment before acting on it.",
+      "Note the appeal deadline (commonly 30 days; verify locally).",
+      "Preserve the trial record if an appeal is possible."
+    ],
+    "caution": "Appeal deadlines run from entry of judgment, not the hearing."
+  },
+  {
+    "stage": "CLOSED",
+    "title": "Case closed",
+    "checklist": [
+      "Archive the complete case file and docket.",
+      "Track settlement disbursement / refund deadlines, if any.",
+      "Retain the docket number for related future filings."
+    ],
+    "caution": "Some claims relate back to closed cases - keep the file complete."
+  }
+]

@@ -1,0 +1,20 @@
+{{NOT_LEGAL_ADVICE}}
+
+CLASS ACTION - CLAIM FORM
+Program of record : {{PROGRAM}} ({{VIOLATION_ID}})
+Source            : {{SOURCE}}
+Claimant          : {{PARTY_NAME}}
+Date of claim     : {{DATE}}
+
+CLAIMANT CERTIFIES, UNDER PENALTY OF PERJURY:
+
+1.  I was a member of the class described in {{PROGRAM}} during the class
+    period, as reflected by the evidence below.
+
+2.  Evidence of class membership (auto-matched, confidence {{CONFIDENCE}}):
+{{EVIDENCE}}
+
+3.  I understand this form is a DRAFT prepared to assist my self-representation
+    and that I am responsible for verifying its accuracy before submission.
+
+Signature: ______________________    Date: {{DATE}}
