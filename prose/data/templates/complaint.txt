@@ -1,0 +1,30 @@
+{{NOT_LEGAL_ADVICE}}
+
+                        {{COURT}}
+                        CASE NO. {{CASE_NO}}
+
+{{PARTY_NAME}},                                      PLAINTIFF,
+    v.
+{{PROGRAM}},
+    (Program of Record: {{VIOLATION_ID}}, Source: {{SOURCE}}),
+                                                       DEFENDANT.
+
+                        COMPLAINT
+
+1.  COMES NOW Plaintiff {{PARTY_NAME}}, proceeding pro se, and alleges:
+
+2.  Basis. Plaintiff is a member of the class affected by {{PROGRAM}},
+    identified through {{SOURCE}} records.
+
+3.  Factual predicate (auto-matched evidence, confidence {{CONFIDENCE}}):
+{{EVIDENCE}}
+
+4.  Claim type: {{CLAIM_TYPE}}.
+
+5.  WHEREFORE, Plaintiff respectfully requests the relief this Court deems just.
+
+Dated {{DATE}}
+
+Respectfully submitted,
+    /s/ {{PARTY_NAME}} (pro se)
+    {{PARTY_NAME}}, pro se

@@ -1,0 +1,35 @@
+[
+  {
+    "id": "vlm-2026-0147",
+    "program": "In re Voltmax Power Bank Marketing Litigation",
+    "source": "PACER",
+    "status": "certified",
+    "window_start": "2024-01-01",
+    "window_end": "2025-12-31",
+    "claim_type": "class_claim",
+    "description": "Class certified on false battery-capacity claims; VLX-200 line subject to recall.",
+    "rules": [{"type": "recall", "recall_skus": ["VLX-200", "VLX-200-B"]}]
+  },
+  {
+    "id": "sub-2026-0312",
+    "program": "FitTrack Auto-Enrollment Complaint (FTC)",
+    "source": "FTC",
+    "status": "open",
+    "window_start": "2025-01-01",
+    "window_end": "2026-12-31",
+    "claim_type": "complaint",
+    "description": "FTC investigation of dark-pattern auto-renewal with no opt-out friction.",
+    "rules": [{"type": "auto_enroll"}]
+  },
+  {
+    "id": "fee-2026-118",
+    "program": "State Card Network Late-Fee Settlement",
+    "source": "PACER",
+    "status": "certified",
+    "window_start": "2025-06-01",
+    "window_end": "2026-06-30",
+    "claim_type": "class_claim",
+    "description": "Settlement certified for excessive automated late fees during the class period.",
+    "rules": [{"type": "overcharge", "fee_description": "late fee", "threshold": 25.0}]
+  }
+]

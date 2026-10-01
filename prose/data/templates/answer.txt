@@ -1,0 +1,15 @@
+{{NOT_LEGAL_ADVICE}}
+
+{{COURT}} - CASE NO. {{CASE_NO}}
+
+ANSWER OF {{PARTY_NAME}} (PRO SE) TO COMPLAINT RE: {{PROGRAM}} ({{VIOLATION_ID}})
+
+1.  On each count of the Complaint, {{PARTY_NAME}} denies each and every
+    allegation not expressly admitted herein.
+
+2.  Relied-upon evidence (auto-matched, confidence {{CONFIDENCE}}):
+{{EVIDENCE}}
+
+Dated {{DATE}}
+
+    /s/ {{PARTY_NAME}}, pro se

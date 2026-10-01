@@ -1,0 +1,58 @@
+[
+  {
+    "id": "hearsay",
+    "label": "Hearsay",
+    "citation": "FRE 802",
+    "min_hits": 1,
+    "prompt": "OBJECTION: HEARSAY (FRE 802) - require the witness's source; offer the underlying record if one exists.",
+    "triggers": ["told me", "she said", "he said", "according to", "my understanding is", "it's my recollection", "i heard that"]
+  },
+  {
+    "id": "speculation",
+    "label": "Speculation",
+    "citation": "FRE 611(b)",
+    "min_hits": 1,
+    "prompt": "OBJECTION: SPECULATION (FRE 611(b)) - question calls for an opinion beyond the witness's personal knowledge.",
+    "triggers": ["in your opinion", "do you think", "do you believe that", "is it possible that"]
+  },
+  {
+    "id": "leading",
+    "label": "Leading question",
+    "citation": "FRE 611(c)",
+    "min_hits": 1,
+    "prompt": "OBJECTION: LEADING (FRE 611(c)) - ask an open question unless cross-examining a hostile witness.",
+    "triggers": ["isn't it true", "is that correct", "you'd agree that", "wouldn't you say"]
+  },
+  {
+    "id": "compound",
+    "label": "Compound question",
+    "citation": "FRE 611(c)",
+    "min_hits": 1,
+    "prompt": "OBJECTION: COMPOUND QUESTION (FRE 611(c)) - ask one question at a time.",
+    "triggers": ["and did you", "and what did you do and", "and when did you"]
+  },
+  {
+    "id": "foundation",
+    "label": "Foundation",
+    "citation": "FRE 901",
+    "min_hits": 1,
+    "prompt": "OBJECTION: FOUNDATION/AUTHENTICATION (FRE 901) - lay the foundation before admitting the item.",
+    "triggers": ["authenticate", "this document", "this is the letter", "see exhibit", "this contract", "this exhibit"]
+  },
+  {
+    "id": "best_evidence",
+    "label": "Best evidence",
+    "citation": "FRE 1002",
+    "min_hits": 1,
+    "prompt": "OBJECTION: BEST EVIDENCE (FRE 1002) - the original is required unless an exception applies.",
+    "triggers": ["just a copy", "my copy of", "photocopy", "where is the original", "i don't have the original"]
+  },
+  {
+    "id": "argument",
+    "label": "Argument to the court",
+    "citation": "FRE 403 / local rule",
+    "min_hits": 1,
+    "prompt": "OBJECTION: ARGUMENT (FRE 403) - examine the witness, not the court; move for a sidebar if it continues.",
+    "triggers": ["let the record", "i submit to the court", "the evidence shows that he", "the evidence shows that she"]
+  }
+]
