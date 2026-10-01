@@ -2,8 +2,13 @@ from __future__ import annotations
 
 import abc
 import json
+from typing import Protocol
 
 from .hud import HudFrame, HudSimulator, TranscriptLine
+
+
+class TranscriptSink(Protocol):
+    def feed_transcript(self, line: TranscriptLine) -> HudFrame: ...
 
 
 class StreamingTranscriber(abc.ABC):
@@ -65,7 +70,7 @@ class StreamingHudSession:
     def __init__(
         self,
         transcriber: StreamingTranscriber,
-        simulator: HudSimulator | None = None,
+        simulator: TranscriptSink | None = None,
         speaker: str = "Speaker",
     ) -> None:
         self.transcriber = transcriber

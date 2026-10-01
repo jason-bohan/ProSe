@@ -1,0 +1,62 @@
+diff --git a/PhoneSDK/packages/bridge-contract/src/debug-consent.js b/PhoneSDK/packages/bridge-contract/src/debug-consent.js
+index faa65f4..ed0e4cb 100644
+--- a/PhoneSDK/packages/bridge-contract/src/debug-consent.js
++++ b/PhoneSDK/packages/bridge-contract/src/debug-consent.js
+@@ -4,25 +4,25 @@ export async function requestDebugApprovals(permissions) {
+   const declarations = normalizePermissions(permissions);
+   return new Promise(resolve=>{
+     const dialog = document.createElement('dialog');
+-    const heading = document.createElement('h2'); heading.textContent='插件权限调试授权';
++    const heading = document.createElement('h2'); heading.textContent='Plugin permissions for testing';
+     const notice = document.createElement('p');
+-    notice.textContent='仅用于开发调试：定位为固定模拟坐标；眼镜录音暂不支持。network 与 H5 自动播放只记录授权，不构成原生 WebView 隔离验证。不要加载不可信插件。';
++    notice.textContent='Development simulator: location uses fixed simulated coordinates; glasses recording is not supported. Network and web audio playback permissions are recorded, but native WebView isolation is not tested. Only load plugins you trust.';
+     dialog.append(heading,notice);
+     const boxes=[];
+     for (const p of declarations) {
+       const row=document.createElement('label'); row.style.display='block';
+       const box=document.createElement('input'); box.type='checkbox'; box.checked=false;
+-      const description=p.name+' / '+(p.required?'必需':'可选')+(p.scope?' '+JSON.stringify(p.scope):'');
++      const description=p.name+' / '+(p.required?'required':'optional')+(p.scope?' '+JSON.stringify(p.scope):'');
+       row.append(box,document.createTextNode(description)); dialog.append(row); boxes.push([p,box]);
+     }
+     const error=document.createElement('p'); dialog.append(error);
+-    const start=document.createElement('button'); start.textContent='按所选权限启动';
+-    const cancel=document.createElement('button'); cancel.textContent='取消';
++    const start=document.createElement('button'); start.textContent='Start with selected permissions';
++    const cancel=document.createElement('button'); cancel.textContent='Cancel';
+     const finish=value=>{dialog.close();dialog.remove();resolve(value);};
+     start.onclick=()=>{
+       const approvals=Object.fromEntries(boxes.filter(([,box])=>box.checked).map(([p])=>[p.name,p.scope??null]));
+       try {authorize('runtime.ready',{},declarations,approvals);finish(approvals);}
+-      catch(e){error.textContent='必需权限尚未全部同意，不能启动。';}
++      catch(e){error.textContent='Approve all required permissions before starting.';}
+     };
+     cancel.onclick=()=>finish(null);
+     dialog.addEventListener('cancel',e=>{e.preventDefault();finish(null);});
+diff --git a/PhoneSDK/tools/browser-studio/index.html b/PhoneSDK/tools/browser-studio/index.html
+index d1c3675..7bd8a69 100644
+--- a/PhoneSDK/tools/browser-studio/index.html
++++ b/PhoneSDK/tools/browser-studio/index.html
+@@ -1,5 +1,5 @@
+ <!doctype html>
+-<html lang="zh-CN">
++<html lang="en">
+   <head>
+     <meta charset="UTF-8">
+     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+diff --git a/PhoneSDK/tools/browser-studio/studio.js b/PhoneSDK/tools/browser-studio/studio.js
+index b4005cc..ae84f17 100644
+--- a/PhoneSDK/tools/browser-studio/studio.js
++++ b/PhoneSDK/tools/browser-studio/studio.js
+@@ -64,8 +64,8 @@ async function launch() {
+   frame.src = '/plugin/' + manifest.entry;
+ }
+ document.querySelector('#reload').addEventListener('click',()=>void launch().catch(e=>log('ERROR',e.message)));
+-const revoke=document.createElement('button'); revoke.textContent='撤销授权并停止';
+-revoke.onclick=()=>{++launchGeneration;runtime.setLifecycle('stopped');runtime.approvals={};frame.src='about:blank';log('AUTH','已撤销，下次启动重新授权');};
++const revoke=document.createElement('button'); revoke.textContent='Revoke permissions and stop';
++revoke.onclick=()=>{++launchGeneration;runtime.setLifecycle('stopped');runtime.approvals={};frame.src='about:blank';log('AUTH','Permissions revoked. Approve again on the next launch.');};
+ document.querySelector('#reload').after(revoke);
+ void launch().catch(e=>log('ERROR',e.message));
+ document.querySelector('#clear').addEventListener('click', () => renderer.clear());

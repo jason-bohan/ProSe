@@ -26,11 +26,30 @@ class TranscriptLine:
 
 
 @dataclass(frozen=True)
+class HudCue:
+    mode: str
+    kind: str
+    headline: str
+    say: str
+    rationale: str
+    next_question: str
+    caveat: str
+    sources: tuple[dict, ...] = ()
+
+
+@dataclass(frozen=True)
 class HudFrame:
     seq: int
     transcript: TranscriptLine
     objections: tuple[Objection, ...]
     prompt: str | None
+    cue: HudCue | None = None
+    status: str | None = None
+    turn_id: int | None = None
+    latency_ms: int | None = None
+    error: str = ""
+    expires_at: float | None = None
+    legal_review: dict | None = None
 
 
 def load_rules() -> tuple[dict, ...]:

@@ -8,3 +8,6 @@ venv/
 env/
 *.jsonl
 prose-hud.jsonl
+.tools/
+artifacts/
+.prose/

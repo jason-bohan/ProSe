@@ -1,0 +1,271 @@
+{
+  "pack": "scouting",
+  "sources": [
+    {
+      "title": "Rules and Regulations — October 2025",
+      "url": "https://www.scouting.org/wp-content/uploads/2025/11/2025-Rules_Regulations_NEB-Approved-10.28.2025.pdf",
+      "category": "Membership and governance",
+      "edition": "NEB approved October 28, 2025",
+      "scope_note": "The revocation section refers to Procedures for Maintaining Standards of Membership and Leadership; that full publication has not been obtained. Do not infer a complete appeal process from this section."
+    },
+    {
+      "title": "Charter and Bylaws — 2025",
+      "url": "https://filestore.scouting.org/filestore/about/2025_Charter_Bylaws.pdf",
+      "category": "Membership and governance",
+      "edition": "Amended October 28, 2025"
+    },
+    {
+      "title": "Membership Standards",
+      "url": "https://www.scouting.org/about/membership-standards/",
+      "category": "Membership and governance"
+    },
+    {
+      "title": "National Forms and Agreements",
+      "url": "https://www.scouting.org/resources/forms/",
+      "category": "Forms and charter agreements",
+      "linked_pdfs": true
+    },
+    {
+      "title": "Annual Unit Charter Agreement — 2026",
+      "url": "https://www.scouting.org/wp-content/uploads/2026/04/524-95626-Annual-Charter-Agreement.pdf",
+      "category": "Membership and governance",
+      "edition": "2026",
+      "scope_note": "Template only: obtain the unit's signed agreement. Duties to register youth and select adult leaders do not, by themselves, identify who may expel a youth or establish a youth-removal procedure."
+    },
+    {
+      "title": "Online Registration Guidebook",
+      "url": "https://www.scouting.org/resources/online-registration/",
+      "category": "Registration and renewal",
+      "linked_pdfs": true
+    },
+    {
+      "title": "Unit and Membership Renewal",
+      "url": "https://www.scouting.org/resources/unit-and-membership-renewal/",
+      "category": "Registration and renewal",
+      "linked_pdfs": true
+    },
+    {
+      "title": "Internal Registration Guidebook",
+      "url": "https://my.scouting.org/",
+      "category": "Membership and governance",
+      "unavailable_reason": "The public forms page directs users to My.Scouting registrar tools or MyBSA for the current internal Registration Guidebook. This manual has not been obtained; the public online registration guide is a different document."
+    },
+    {
+      "title": "Guide to Safe Scouting — all online chapters",
+      "url": "https://www.scouting.org/health-and-safety/gss/toc/",
+      "category": "Safety and activities",
+      "linked_pdfs": true,
+      "follow": [
+        "https://www.scouting.org/health-and-safety/gss/"
+      ]
+    },
+    {
+      "title": "Youth Protection and Adult Leadership — Barriers to Abuse",
+      "url": "https://www.scouting.org/health-and-safety/gss/gss01/",
+      "category": "Youth protection and conduct",
+      "linked_pdfs": true
+    },
+    {
+      "title": "Scouter Code of Conduct",
+      "url": "https://www.scouting.org/health-and-safety/gss/bsa-scouter-code-of-conduct/",
+      "category": "Youth protection and conduct",
+      "scope_note": "Adult Scouter obligations; do not substitute these for rules governing a youth's membership."
+    },
+    {
+      "title": "Youth Protection and Barriers to Abuse FAQs",
+      "url": "https://www.scouting.org/health-and-safety/yp-faqs/",
+      "category": "Youth protection and conduct",
+      "linked_pdfs": true
+    },
+    {
+      "title": "Safeguarding Youth",
+      "url": "https://www.scouting.org/training/safeguarding-youth/",
+      "category": "Youth protection and conduct",
+      "linked_pdfs": true
+    },
+    {
+      "title": "Bullying Prevention Guide",
+      "url": "https://filestore.scouting.org/filestore/training/pdf/BullyingPreventionGuide.pdf",
+      "category": "Youth protection and conduct"
+    },
+    {
+      "title": "SAFE Checklist",
+      "url": "https://www.scouting.org/health-and-safety/safe/",
+      "category": "Safety and activities",
+      "linked_pdfs": true
+    },
+    {
+      "title": "Health and Safety Resources and Forms",
+      "url": "https://www.scouting.org/health-and-safety/resources-forms/",
+      "category": "Safety and activities",
+      "linked_pdfs": true
+    },
+    {
+      "title": "Incident Reporting",
+      "url": "https://www.scouting.org/health-and-safety/incident-report/",
+      "category": "Youth protection and conduct",
+      "linked_pdfs": true,
+      "follow": [
+        "https://www.scouting.org/health-and-safety/incident-report/"
+      ]
+    },
+    {
+      "title": "Guide to Advancement — 2025",
+      "url": "https://filestore.scouting.org/filestore/pdf/33088.pdf",
+      "category": "Advancement and reviews",
+      "edition": "2025",
+      "scope_note": "Advancement rules and appeals; these are not automatically membership-removal procedures."
+    },
+    {
+      "title": "Advancement Resources",
+      "url": "https://www.scouting.org/programs/scouts-bsa/advancement-and-awards/resources/",
+      "category": "Advancement and reviews",
+      "linked_pdfs": true
+    },
+    {
+      "title": "Advancement Updates — 2026",
+      "url": "https://www.scouting.org/wp-content/uploads/2025/12/Advancement-updates-2026_2.pdf",
+      "category": "Advancement and reviews",
+      "edition": "2026"
+    },
+    {
+      "title": "Board of Review Guide — 2025",
+      "url": "https://www.scouting.org/wp-content/uploads/2025/06/512-94225-SBSA-Board-of-Review-Guide.pdf",
+      "category": "Advancement and reviews",
+      "edition": "2025"
+    },
+    {
+      "title": "Special Needs and Disabilities",
+      "url": "https://www.scouting.org/resources/disabilities-awareness/",
+      "category": "Disabilities and inclusion",
+      "linked_pdfs": true,
+      "follow": [
+        "https://www.scouting.org/resources/inclusion-toolbox/"
+      ]
+    },
+    {
+      "title": "Inclusion Toolbox — complete 2026 edition",
+      "url": "https://filestore.scouting.org/filestore/resources/Disabilities%20Awareness/34059%2826%29-Inclusion-Toolbox.pdf",
+      "category": "Disabilities and inclusion",
+      "edition": "2026",
+      "scope_note": "Disability support guidance; distinguish its recommendations from binding national requirements."
+    },
+    {
+      "title": "Inclusion Toolbox — online introduction",
+      "url": "https://www.scouting.org/resources/inclusion-toolbox/introduction-inclusion-toolbox/",
+      "category": "Disabilities and inclusion",
+      "linked_pdfs": true,
+      "follow": [
+        "https://www.scouting.org/resources/inclusion-toolbox/"
+      ]
+    },
+    {
+      "title": "Guide to Awards and Insignia",
+      "url": "https://www.scouting.org/resources/insignia-guide/",
+      "category": "Uniforms and recognition",
+      "linked_pdfs": true
+    },
+    {
+      "title": "Chartered Organization Representative Guidebook",
+      "url": "https://scoutingwire.org/wp-content/uploads/2016/08/511-42116_WEB-.pdf",
+      "category": "Leadership and unit operation",
+      "edition": "2016",
+      "scope_note": "Older guidance. Later bylaws, rules and the signed 2026 charter agreement may supersede it."
+    },
+    {
+      "title": "Chartered Organization Resource Guide",
+      "url": "https://scoutingwire.org/wp-content/uploads/2016/05/Chartered-Organization-Resource-Guide_522-925_wb.pdf",
+      "category": "Leadership and unit operation",
+      "edition": "2016",
+      "scope_note": "Older guidance; verify against later national rules and current signed agreements."
+    },
+    {
+      "title": "Troop Leader Resources — general troop information",
+      "url": "https://troopleader.scouting.org/general-troop-information/",
+      "category": "Leadership and unit operation",
+      "linked_pdfs": true,
+      "follow": [
+        "https://troopleader.scouting.org/general-troop-information/"
+      ]
+    },
+    {
+      "title": "Scout Oath and Scout Law",
+      "url": "https://www.scouting.org/about/faq/question10/",
+      "category": "Values and program"
+    },
+    {
+      "title": "About Scouts BSA",
+      "url": "https://www.scouting.org/programs/scouts-bsa/about-scouts-bsa/",
+      "category": "Values and program",
+      "linked_pdfs": true
+    },
+    {
+      "title": "Language of Scouting",
+      "url": "https://www.scouting.org/resources/los/",
+      "category": "Values and program"
+    },
+    {
+      "title": "Federal charter — 36 USC Chapter 309",
+      "url": "https://uscode.house.gov/view.xhtml?path=/prelim@title36/subtitle2/partB/chapter309&edition=prelim",
+      "category": "Legal context — federal",
+      "kind": "law",
+      "scope_note": "Federal corporate charter. It does not by itself specify every troop removal procedure or make a private troop a government actor."
+    },
+    {
+      "title": "Indiana nonprofit law — official code access",
+      "url": "https://iga.in.gov/legislative/laws/2026/ic/titles/023",
+      "category": "Legal context — Indiana",
+      "kind": "law",
+      "scope_note": "Check applicability to the actual entity and statutory member definition before relying on nonprofit membership rules."
+    },
+    {
+      "title": "Indiana nonprofit member definition — IC 23-17-2-17 (2025 mirror)",
+      "url": "https://law.justia.com/codes/indiana/title-23/article-17/chapter-2/section-23-17-2-17/",
+      "category": "Legal context — Indiana",
+      "kind": "law",
+      "edition": "2025 code mirror; current official edition not verified",
+      "scope_note": "Statutory corporate membership differs from youth program registration. Secondary host of statutory text; check current official code."
+    },
+    {
+      "title": "Indiana nonprofit membership termination — IC 23-17-8-2 (2025 mirror)",
+      "url": "https://law.justia.com/codes/indiana/title-23/article-17/chapter-8/section-23-17-8-2/",
+      "category": "Legal context — Indiana",
+      "kind": "law",
+      "edition": "2025 code mirror; current official edition not verified",
+      "scope_note": "Applies to members of qualifying public/mutual benefit corporations. Do not assume an individual Scout qualifies or that a particular unit is such a corporation. Subsection (b) has alternative procedures; do not assert a universal 15-day notice requirement."
+    },
+    {
+      "title": "Boy Scouts of America v. Dale, 530 US 640 (2000)",
+      "url": "https://tile.loc.gov/storage-services/service/ll/usrep/usrep530/usrep530640/usrep530640.pdf",
+      "category": "Legal context — federal",
+      "kind": "law",
+      "edition": "2000 Supreme Court opinion",
+      "scope_note": "Historical adult-leader expressive-association dispute under New Jersey law. It does not supply current Scouting policy or resolve every youth membership dispute in Indiana."
+    },
+    {
+      "title": "ADA Title III exemptions — 42 USC 12187",
+      "url": "https://uscode.house.gov/view.xhtml?req=granuleid:USC-prelim-title42-section12187&num=0&edition=prelim",
+      "category": "Legal context — federal",
+      "kind": "law",
+      "scope_note": "Private-club and religious-entity exemptions require an applicability analysis; inclusion support and Scouting's internal obligations are separate questions."
+    },
+    {
+      "title": "Youth Membership Application",
+      "url": "https://filestore.scouting.org/filestore/pdf/524-406.pdf",
+      "category": "Membership and governance"
+    },
+    {
+      "title": "Adult Membership Application",
+      "url": "https://filestore.scouting.org/filestore/pdf/524-501.pdf",
+      "category": "Membership and governance",
+      "scope_note": "Adult application; do not automatically apply its provisions to a youth."
+    },
+    {
+      "title": "Understanding and Preventing Youth-on-Youth Abuse — facilitator guide",
+      "url": "https://www.scouting.org/wp-content/uploads/2024/01/Understanding-and-Preventing-Youth-on-Youth-Abuse-Training-for-Camp-Directors-facilitators-Guide-2024.pdf",
+      "category": "Youth protection and conduct",
+      "edition": "Revision January 11, 2024",
+      "scope_note": "Camp training guide; includes youth inquiry material, not the complete membership removal manual."
+    }
+  ]
+}

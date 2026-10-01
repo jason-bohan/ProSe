@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "collections": [
+    {
+      "title": "Debate & reasoning",
+      "level": "Intermediate",
+      "words": "abstraction, analogy, analytical, antecedent, antithesis, assertion, assumption, axiom, causality, coherence, cogent, conjecture, contradiction, counterargument, deduction, dialectic, dichotomy, discrepancy, fallacy, generalization, hypothesis, implication, inference, inconsistency, inductive, invalid, logical, paradox, premise, presupposition, proposition, rational, rationale, rebuttal, refutation, relevant, syllogism, tautology, tenable, thesis, untenable, validity, veracity, plausible, implausible, substantiation, counterexample, circularity, causation, necessary, sufficient, deductive, probabilistic, dogmatic"
+    },
+    {
+      "title": "Evidence & research",
+      "level": "Intermediate",
+      "words": "anecdotal, corroboration, credible, credibility, empirical, falsifiable, reliability, reproducible, verifiable, testimony, documentation, observation, scrutiny, verification, provenance, authenticity, corroborate, substantiate, disprove, ascertain, investigate, corroborative, circumstantial, conclusive, inconclusive, dubious, spurious, unfounded, unsubstantiated, unverified, bias, correlation, variable, sample, methodology, qualitative, quantitative, statistical, extrapolation, approximation, estimation, discrepancy, accuracy, precision, uncertainty, probability, possibility, likelihood, anomaly, consistency, representative, objective|bias, subjective"
+    },
+    {
+      "title": "Law & procedure",
+      "level": "Intermediate",
+      "words": "affidavit, allegation, appellant, arbitration, arraignment, acquittal, adjudication, admissibility, adversary, alibi, amicus curiae, appeal|legal, attestation, bailiff, beneficiary, bequest, breach of contract, burden of proof, caveat, civil law, claimant, codicil, contempt of court, contract|binding, corroboration, counsel|lawyer, counterclaim, cross-examination, damages|compensation, declaratory, decree|legally, defendant, deposition|witness, discovery|compulsory, dissent|opinion, duress, encumbrance, estoppel, exculpatory, executor, exoneration, indemnity, injunction, interlocutory, intestate, jurisdiction, jurisprudence, liability|legally, lien, litigant, litigation, mediation, negligence|prudence, notarize, perjury, petition|authority, plaintiff, pleading, precedent|law, probative, probate, procedural, proffer, restitution, subpoena, substantive, tort, tribunal, venue|law, verdict, waiver, writ"
+    },
+    {
+      "title": "Communication & listening",
+      "level": "Essential",
+      "words": "acknowledge, articulate, attentive, audience, candid, clarify, concise, concession, conciliatory, constructive, context, courteous, deliberate, dialogue, diplomacy, discern, eloquent, empathy, explicit, expressive, facilitate, frank, impartial, inquisitive, interpret, lucid, nuance, paraphrase, perceptive, perspective, persuasive, receptive, reflective, reiterate, respectful, responsive, restate, reticent, rhetorical, sincerity, succinct, tactful, understanding, vocabulary, verbose, wordiness, ambiguity, elucidate, explain, summarize, comprehension, interpretation, misinterpretation"
+    },
+    {
+      "title": "Policy & ethics",
+      "level": "Intermediate",
+      "words": "accountability, autonomy, beneficence, bureaucracy, civic, collective, consensus, constituency, consequential, deliberation, democracy, discrimination, distributive, egalitarian, equitable, ethical, exploitation, externality, governance, humanitarian, incentive, inclusion, institutional, integrity, legitimacy, liberty, mandate, marginalization, meritocracy, normative, paternalism, pluralism, pragmatic, proportionality, reciprocity, regulation, representation, responsibility, sovereignty, stewardship, sustainability, transparency, utilitarian, welfare, proportional, feasible, viability, implementation, constraint, allocation, efficacy, efficiency, unintended, fiscal, expenditure, revenue"
+    },
+    {
+      "title": "Negotiation & conflict",
+      "level": "Intermediate",
+      "words": "accommodation, accord, acquiesce, advocacy, agenda, alienation, antagonism, appeasement, assertive, collaboration, compromise, concurrence, concession, conciliation, confrontation, contention, cooperation, deadlock, deference, defuse, deterrence, disagreement, disinterested, dispute, dissent, entrenchment, escalation, goodwill, impasse, intransigent, leverage|strategic, mediation, mitigate, mutual, negotiation, objective|goal, opposition, persuasion, reconcile, reconciliation, reciprocal, resolution|solution, restraint, rapprochement, stalemate, stipulate, tolerance, ultimatum, unilateral, vindictive, voluntary, antagonistic, hostility"
+    },
+    {
+      "title": "Precise wording",
+      "level": "Intermediate",
+      "words": "absolute, abstract, adjacent, aggregate, alternative, analogous, apparent, approximate, arbitrary, asymmetrical, categorical, chronological, compatible, complementary, comprehensive, conditional, contingent, cumulative, definitive, discrete, disparate, distinct, divergent, equivalent, exclusive, exhaustive, extraneous, implicit, incidental, incremental, inherent, intrinsic, literal, material|relevant, nominal, objective|bias, operational, peripheral, pertinent, provisional, qualitative, relative, residual, salient, sequential, simultaneous, specific, subsequent, substantive, supplementary, tangible, tentative, unambiguous, unequivocal, uniform, variable, ambiguous, requisite, negligible, substantial"
+    },
+    {
+      "title": "Advanced expression",
+      "level": "Advanced",
+      "words": "aberration, abrogate, abstruse, adroit, anachronism, ancillary, antipathy, apocryphal, apposite, assiduous, attenuate, bellicose, circumspect, cogency, commensurate, concomitant, conflate, conundrum, deleterious, demarcation, didactic, disingenuous, disparate, dogmatism, eclectic, efficacy, enervate, epiphenomenon, equivocate, esoteric, exigent, expeditious, extrapolate, fastidious, fortuitous, germane, heterogeneity, ignominious, immutable, inchoate, incongruous, ineffable, ineluctable, intransigence, laconic, magnanimous, malleable, obfuscate, obviate, ostensible, parsimonious, perfunctory, perspicacious, polemical, prescient, prescriptive, prosaic, punctilious, recalcitrant, recondite, specious, tacit, tendentious, ubiquitous, vacillate, vindicate, vitriolic, ameliorate, delineate, elucidation"
+    }
+  ]
+}
