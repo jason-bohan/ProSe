@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ProSe · MemoMind One</title>
+  <style>
+    body{font:16px system-ui,sans-serif;background:#0b161b;color:#d5f3e6;margin:0;padding:24px}
+    main{max-width:540px;margin:auto}h1{font-size:26px;font-weight:500}
+    label{display:block;margin:20px 0 8px}input{box-sizing:border-box;width:100%;padding:12px;
+    background:#152b32;border:1px solid #7da497;color:inherit;border-radius:6px}
+    button{padding:12px 20px;margin:14px 8px 0 0;border:0;border-radius:6px;cursor:pointer}
+    button:disabled{opacity:.5}#preview{min-height:120px;font-size:24px;line-height:1.4;
+    border:1px solid #7da497;border-radius:12px;padding:20px;margin:24px 0}
+    .help{font-size:14px;color:#aac8bc}#status{min-height:48px}
+  </style>
+</head>
+<body><main>
+  <h1>ProSe live coach</h1>
+  <p class="help">Litigation and debate cues on MemoMind One.</p>
+  <p id="status" role="status">Connecting to MemoMind…</p>
+  <button id="sample" type="button" disabled>Show sample cue</button>
+  <p class="help">Try the green glasses preview with a sample. For live AI cues,
+    start a Live coach session in ProSe and paste its MemoMind stream link below.</p>
+  <form id="connect-form">
+    <label for="session-url">Glasses stream link from your ProSe session</label>
+    <input type="url" id="session-url" required autocomplete="off" spellcheck="false"
+      placeholder="https://your-service/api/copilot/events?session_id=…">
+    <button id="connect" disabled>Connect display</button>
+    <button id="disconnect" type="button" disabled>Disconnect and clear</button>
+  </form>
+  <div id="preview" aria-live="polite">No suggestion.</div>
+  <p class="help">This plugin relays short cues. Start the session and microphone in the
+    ProSe companion. This version does not capture audio from the glasses.</p>
+  <p class="help">The link grants access to that live stream. Keep it private.
+    Display updates pause when this plugin leaves the foreground.</p>
+  <script type="module" src="./plugin.mjs"></script>
+</main></body></html>

@@ -40,8 +40,12 @@ def format_frame_lines(frame: dict, width: int = 72) -> list[str]:
     """Render one HudFrame payload (see prose.device.frame_to_payload) as the
     lines a monochrome waveguide display would show for it."""
     lines: list[str] = []
-    header = f"{DIM}#{frame['seq']}{RESET} {BOLD}{frame['speaker']}:{RESET} {frame['transcript']}"
+    speaker, transcript = frame.get("speaker", "HUD"), frame.get("transcript", "")
+    header = f"{DIM}#{frame['seq']}{RESET} {BOLD}{speaker}:{RESET} {transcript}"
     lines.extend(textwrap.wrap(header, width=width, subsequent_indent="    ") or [header])
+    if frame.get("status"):
+        status = frame["status"]
+        lines.append(f"{DIM}ASSIST: {status}{RESET}")
     for objection in frame.get("objections", ()):
         text = (
             f"{RED}⚠ OBJECTION{RESET} {objection['label']} ({objection['citation']}) "
@@ -95,6 +99,8 @@ class TerminalGlassesEmulator:
         self._out = out
 
     def feed(self, frame: dict) -> None:
+        if frame.get("status"):
+            self._frames.clear()
         self._frames.append(frame)
         out = self._out
         out.write(CLEAR_HOME)

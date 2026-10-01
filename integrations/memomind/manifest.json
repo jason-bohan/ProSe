@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "permissionPolicyVersion": 1,
+  "bridgeVersion": "2.0",
+  "id": "com.prose.livecoach",
+  "name": "ProSe Live Coach",
+  "version": "0.1.0",
+  "entry": "index.html",
+  "permissions": [
+    {"name": "display", "required": true},
+    {"name": "network", "required": true}
+  ],
+  "deviceRequirements": {
+    "preferredPluginId": "com.gm.example.web-bridge",
+    "protocols": [{"id": "gm.scene", "minVersion": "1.0"}]
+  }
+}

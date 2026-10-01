@@ -6,6 +6,10 @@ End-to-end pro se litigation assistant: court/regulatory ingestion → consumer-
 
 ## Quickstart
 
+Scouting guideline debates now have a searchable local research library at `/research`.
+See [RESEARCH.md](RESEARCH.md) for national-source coverage, offline storage and
+importing a situation folder downloaded from Google Drive.
+
 ```
 python -m prose.cli simulate                          # end-to-end demo pipeline
 python -m prose.cli simulate --transport jsonl=hud.jsonl   # stream HUD frames as JSON lines
@@ -21,6 +25,102 @@ python -m pytest -k emulation  # network/device/ASR emulation tests only
 python -m ruff check .         # lint
 ```
 
+## Vocabulary builder with offline practice
+
+Open `/vocabulary` for a saved word notebook, root/family notes, your own
+explanations and sentences, and spaced recall. The 24 original starter cards
+cover evidence, reasoning, precision, listening and policy. Select focus words
+before opening a debate: the private coach receives up to three, explains their
+nuance, and gives feedback on your actual usage. Debate use does not automatically
+advance recall progress.
+
+Dictionary lookups try [FreeDictionaryAPI.com](https://freedictionaryapi.com/)
+and retain licensed results locally. If unavailable, they fall back to cached
+results, an installed Open English WordNet dictionary, or saved notebook entries.
+Turn off online lookup to keep requests local. Install the full offline dictionary:
+
+```sh
+python -m prose.lexicon
+```
+
+Personal notes and progress use SQLite transactions in `.prose/vocabulary.sqlite3`.
+Download/import a versioned JSON backup from the page, or export tab-separated
+cards for Anki. Reviews use a transparent Leitner schedule; Anki's scheduler is
+not embedded. The local app must be running for offline study. Hosted AI debate
+still requires connectivity unless you configure a local model.
+
+See [the learning and data guide](VOCABULARY.md) for sources, backup behavior,
+offline scope, and the Bo Seo-inspired listening exercises.
+
+## Debate practice without glasses
+
+Start the experimental ChatJimmy demo connection without an API key:
+
+```sh
+python -m prose.cli serve --port 8003 --ai-provider chatjimmy
+```
+
+The provider is identified as Llama 3.1 8B; the public demo can change or become
+unavailable. [SETUP.md](SETUP.md) also covers Groq's free API plan and private key entry.
+
+Open `/practice` to debate a real AI opponent with a separate private coach.
+Use the **AI model** menu to select ChatJimmy or a configured Ollama or MLX model. You can
+switch between turns while keeping the conversation and your draft. See
+[model selection setup](SETUP.md#choose-the-debate-model-including-your-own-ollama-host)
+to add a Mac Studio or another model host. Enable **Consult legal specialist
+(Saul)** for a separate legal review before your coach finalizes a suggestion.
+Review status and source references appear beside the coach. See
+[Saul setup and memory limits](SETUP.md#mlx-main-model-and-saul-7b-legal-consultation).
+Choose your topic, your position, an opponent outlook (including MAGA supporter,
+progressive, libertarian, skeptic, opposing counsel, or custom), and temperament
+(curious, firm, stubborn, or combative). The coach suggests your opening; edit it
+or write your own, send it, and the opponent responds in character. Each round
+includes feedback and a suggested next reply. Optional browser dictation and
+read-aloud let you practice speaking. No glasses are required.
+
+Practice uses the same model configuration described below. Each reply makes
+two separate model calls: opponent first, coach second. Personas are fictional;
+claims are not automatically fact-checked. Sessions retain up to 20 rounds in
+memory and expire after 30 idle minutes or a server restart. Download the
+conversation before ending if you want to keep it.
+
+## Live litigation and debate coach
+
+Open `/copilot` after `prose serve` to start a **Debate coach** or **Litigation
+coach** session. Supply your role, objective, case notes, and source documents;
+then paste transcript turns or enable the browser microphone. The glasses
+preview shows one short suggestion, while the companion shows its explanation,
+follow-up question, uncertainty, and supplied sources.
+
+For the microphone-to-glasses pipeline:
+
+```sh
+prose listen --mic --model PATH_TO_VOSK_MODEL --assist debate --transport jsonl=live_hud.jsonl
+prose listen --mic --model PATH_TO_VOSK_MODEL --assist litigation --context case.json --transport ws=ws://127.0.0.1:9000
+```
+
+The optional model runs in a background worker, retains 16 recent turns, and
+coalesces pending requests. New speech clears the previous cue; obsolete
+responses and responses older than 15 seconds are discarded. Visible cues
+expire after 15 seconds. Existing simulation and rule-based commands remain
+available without a model.
+
+Configure a local or hosted OpenAI-compatible endpoint as described in
+[SETUP.md](SETUP.md#live-coach-model-configuration). A Gemini key already in the
+environment enables the default `gemini-2.5-flash` configuration; model access
+and response time still depend on the provider. Transcripts are sent only when
+you explicitly start a coaching session or use `--assist`.
+
+This adds context-aware model inference, not a measured bar exam qualification.
+Legal accuracy and useful response time still need evaluation on realistic
+transcripts and the target glasses. The included federal evidence summaries
+are narrow reference aids; state rules require supplied jurisdictional context.
+
+For **MemoMind One**, [the PhoneSDK display relay](integrations/memomind/README.md)
+uses the vendor's `gm.display` interface and the session's compact stream link.
+The relay source and device setup are included; installation, glasses audio
+decoding, and physical phone/glasses validation are still required.
+
 Environment setup, live data-source notes, and the "intentionally not used" list live
 in [SETUP.md](SETUP.md).
 
@@ -32,8 +132,13 @@ prose/matcher.py        consumer violation / class-action matcher (rule types)
 prose/docs.py           jurisdictional template rendering (draft documents)
 prose/state_machine.py  lawsuit stage tracking with validated transitions
 prose/hud.py            ASR stub + FRE objection engine + teleprompter
+prose/copilot.py        contextual model coaching + bounded asynchronous sessions
+prose/copilot_web.py    live companion, debate/courtroom controls, glasses preview
+prose/debate.py         AI practice opponent, private coach, bounded turn history
+prose/debate_web.py     practice room, personalities, editable cues, browser voice
 prose/device.py         HUD transport layer (console, JSONL stream, WebSocket)
-prose/web.py            web dashboard (ThreadingHTTPServer + SSE HUD stream)
+prose/web.py            web dashboard (discovery review + wikilink graph,
+                        recall search, class actions, collections, SSE HUD)
 prose/tagger.py         batch entity tagging (dates, parties, amounts, keywords)
 prose/briefing.py       pre-prepared stage briefings checklist lookup
 prose/pipeline.py       end-to-end wiring (confidence threshold + human review queue)
@@ -43,7 +148,8 @@ prose/data/             objection rules, sample violation feed, briefings, form 
 
 ## Design for low-capability models
 
-The pipeline assumes a low-capability model (or none at all) in the hot path:
+The original simulation pipeline assumes a low-capability model (or none at all)
+in the hot path. The optional live coach adds a separate model worker:
 
 - **Batch processing**: ingestion, matching, tagging, and doc rendering are one-shot batch jobs, not real-time inference.
 - **Keyword/rule matching**: the matcher, tagger, and HUD objection engine are regex/keyword lookups, not LLM calls.
