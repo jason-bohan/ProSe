@@ -10,6 +10,8 @@ CONTROLLER_CSS = r"""
 clip-path:inset(50%);white-space:nowrap}
 :root{--pad:clamp(.9rem,4vw,1.4rem)}
 body{background:var(--k);color:var(--tw)}
+a{color:var(--tw)}
+a:hover{color:var(--o)}
 .wrap{max-width:34rem;margin:0 auto;padding:var(--pad);padding-bottom:7.5rem}
 .top{display:flex;align-items:baseline;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem}
 .top strong{color:var(--g);font-size:1.1rem;letter-spacing:.08em}
