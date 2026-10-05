@@ -24,6 +24,8 @@ from .hud import HudCue, HudFrame, TranscriptLine
 RULES_PATH = Path(__file__).parent / "data" / "courtroom_rules.json"
 MODES = ("litigation", "debate")
 STAGES = ("discussion", "direct", "cross", "argument", "deposition")
+MOOD_LABELS = ("calm", "confident", "tense", "defensive", "frustrated", "neutral")
+MOMENTUM_SIGNALS = (-2, -1, 0, 1, 2)
 PROMPT_VERSION = "copilot-1"
 
 SYSTEM_PROMPT = """You are a concise live coach for an AR smart-glasses wearer.
@@ -49,6 +51,24 @@ facts from values. Recognize valid counterarguments and concessions. Do not
 invent statistics or attack the person. Help the wearer argue their stated
 position while acknowledging where the evidence favors the other side.
 
+The user JSON includes a tone object with exactly four named traits, each on a
+0 (low pole) to 4 (high pole) scale, plus a tone_poles object mapping each trait
+to its [low, high] pole labels (e.g. humor vs seriousness). Use it to shape
+word choice, bluntness, warmth, levity, and pacing in headline/say/rationale
+only. Tone never relaxes the factual, citation, evidentiary, or
+objection-authority rules above: it never justifies inventing facts, softening
+a caveat that is actually needed, or fabricating confidence.
+
+Always include speaker_mood and momentum_signal, even when kind is none.
+Classify speaker_mood from the most recent turn's wording alone -- you have no
+audio or prosody signal, only text, so this is a sentiment read, not a vocal-tone
+measurement. Rate momentum_signal as a playful, subjective read of which way the
+last few turns have swung for the wearer's stated role/side: -2 (losing ground)
+to +2 (gaining ground), 0 for even or unclear. This is an engagement signal only,
+never a legal-merit or outcome prediction, and must never change your factual,
+citation, or evidentiary conclusions above -- it only reflects rhetorical
+momentum visible in the transcript.
+
 Give a brief rationale, not hidden chain-of-thought. Only cite source IDs that
 appear in supplied sources. A source's existence does not establish the truth
 of an allegation. Use no formal citation in prose that is absent from sources.
@@ -59,7 +79,9 @@ Output exactly one JSON object, without markdown:
  "rationale":"at most 900 characters, concise explanation and relevant exception",
  "next_question":"at most 180 characters",
  "caveat":"at most 240 characters, uncertainty or missing fact; empty if none",
- "source_ids":["an exact supplied source ID"]}
+ "source_ids":["an exact supplied source ID"],
+ "speaker_mood":{"label":"calm|confident|tense|defensive|frustrated|neutral","intensity":1-5},
+ "momentum_signal":-2}
 Use kind none with empty headline/say for housekeeping, a recess, no useful cue,
 or when the wearer should simply listen. Avoid manufacturing a point each turn.
 """
@@ -67,6 +89,18 @@ or when the wearer should simply listen. Avoid manufacturing a point each turn.
 
 class CopilotError(RuntimeError):
     """An actionable, credential-free error safe to show on the companion."""
+
+
+def _as_int(value: object) -> int | None:
+    """Tolerate a model-emitted numeric field arriving as a whole-number float
+    (e.g. 3.0) -- JSON generation from LLMs isn't always consistent about
+    integer vs. float formatting. Bool is explicitly excluded even though
+    Python treats it as an int subtype."""
+    if type(value) is int:
+        return value
+    if type(value) is float and value.is_integer():
+        return int(value)
+    return None
 
 
 def _text(value: object, name: str, limit: int, *, required: bool = False) -> str:
@@ -115,6 +149,78 @@ class SessionConfig:
         return cls(**values)
 
 
+# The personality matrix: four bipolar 0-4 traits per mode. A trait's value is
+# its position from the low pole (0) to the high pole (4); the poles name both
+# ends so every surface (glasses bar, phone pad, web pad) labels the same axis.
+TRAIT_SETS: dict[str, tuple[str, ...]] = {
+    "debate": ("humor", "rhetoric", "attack", "listening"),
+    "litigation": ("directness", "formality", "encouragement", "urgency"),
+}
+TRAIT_POLES: dict[str, tuple[str, str]] = {
+    "humor": ("humor", "seriousness"),
+    "rhetoric": ("reason", "rhetoric"),
+    "attack": ("build", "attack"),
+    "listening": ("press", "listen"),
+    "directness": ("measured", "blunt"),
+    "formality": ("plain", "formal"),
+    "encouragement": ("exacting", "supportive"),
+    "urgency": ("unhurried", "urgent"),
+}
+TRAIT_DEFAULTS: dict[str, int] = {name: 2 for name in TRAIT_POLES}
+
+
+@dataclass(frozen=True)
+class ToneMatrix:
+    """One mode's delivery-style dials, separate from the session's fixed identity.
+
+    Unlike SessionConfig, this is replaced wholesale on each adjustment and never
+    gates validation rules -- it only ever shapes wording in the model prompt.
+    Values are ordered as TRAIT_SETS[mode] and run from low pole (0) to high
+    pole (4).
+    """
+
+    mode: str = "debate"
+    values: tuple[int, int, int, int] = (2, 2, 2, 2)
+
+    def __post_init__(self) -> None:
+        if self.mode not in TRAIT_SETS:
+            raise ValueError("unknown personality mode")
+        if len(self.values) != len(TRAIT_SETS[self.mode]):
+            raise ValueError("a tone needs exactly four traits")
+        if any(type(v) is not int or not 0 <= v <= 4 for v in self.values):
+            raise ValueError("tone traits must be integers from 0 to 4")
+
+    @property
+    def traits(self) -> tuple[str, ...]:
+        return TRAIT_SETS[self.mode]
+
+    @classmethod
+    def from_dict(cls, mode: str, data: dict) -> ToneMatrix:
+        if mode not in TRAIT_SETS:
+            raise ValueError("unknown personality mode")
+        if not isinstance(data, dict):
+            raise ValueError("tone settings must be an object")
+        known = TRAIT_SETS[mode]
+        for key in data:
+            if key not in known:
+                raise ValueError(f"{key} is not a {mode} personality trait")
+        values = []
+        for name in known:
+            value = data.get(name, TRAIT_DEFAULTS[name])
+            if type(value) is not int or not 0 <= value <= 4:
+                raise ValueError(f"{name} must be an integer from 0 to 4")
+            values.append(value)
+        return cls(mode, tuple(values))
+
+    def as_payload(self) -> dict[str, int]:
+        """Flat {trait: value} for prompts and snapshots."""
+        return dict(zip(self.traits, self.values, strict=True))
+
+    @property
+    def poles(self) -> dict[str, list[str]]:
+        return {name: list(TRAIT_POLES[name]) for name in self.traits}
+
+
 def courtroom_sources(config: SessionConfig) -> tuple[SourceNote, ...]:
     if config.mode != "litigation" or config.jurisdiction != "US federal":
         return ()
@@ -140,7 +246,7 @@ def selected_sources(data: dict, documents: list, *, litigation: bool) -> tuple[
 
 class Coach(Protocol):
     def respond(self, config: SessionConfig, turns: list[dict],
-                sources: tuple[SourceNote, ...]) -> dict: ...
+                sources: tuple[SourceNote, ...], tone: ToneMatrix) -> dict: ...
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -270,10 +376,11 @@ class ModelCoach:
         self.max_completion_tokens = max_completion_tokens
 
     def respond(self, config: SessionConfig, turns: list[dict],
-                sources: tuple[SourceNote, ...]) -> dict:
+                sources: tuple[SourceNote, ...], tone: ToneMatrix) -> dict:
         return self.complete_json(SYSTEM_PROMPT, {
             "session": asdict(config), "recent_turns": turns,
-            "sources": [asdict(s) for s in sources],
+            "sources": [asdict(s) for s in sources], "tone": tone.as_payload(),
+            "tone_poles": tone.poles,
         })
 
     def complete_json(self, system_prompt: str, context: dict, *,
@@ -384,8 +491,18 @@ def parse_cue(data: dict, config: SessionConfig, sources: tuple[SourceNote, ...]
             raise ValueError("cue headline is required")
         if kind == "none":
             fields["headline"] = fields["say"] = fields["next_question"] = ""
+        mood = data.get("speaker_mood", {})
+        mood_intensity = _as_int(mood.get("intensity") if isinstance(mood, dict) else None)
+        if (not isinstance(mood, dict) or mood.get("label") not in MOOD_LABELS
+                or mood_intensity not in (1, 2, 3, 4, 5)):
+            raise ValueError("invalid speaker mood")
+        momentum_signal = _as_int(data.get("momentum_signal"))
+        if momentum_signal not in MOMENTUM_SIGNALS:
+            raise ValueError("invalid momentum signal")
         references = tuple(asdict(available[i]) for i in dict.fromkeys(ids))
-        return HudCue(mode=config.mode, kind=kind, sources=references, **fields)
+        return HudCue(mode=config.mode, kind=kind, sources=references,
+                     mood_label=mood["label"], mood_intensity=mood_intensity,
+                     momentum_signal=momentum_signal, **fields)
     except (ValueError, TypeError, AttributeError) as exc:
         raise CopilotError(f"Suggestion could not be validated: {exc}.") from exc
 
@@ -399,7 +516,8 @@ class CopilotSession:
 
     def __init__(self, config: SessionConfig, coach: Coach,
                  sources: tuple[SourceNote, ...] = (), *,
-                 max_age: float = 15.0, debounce: float = 0.25) -> None:
+                 max_age: float = 15.0, debounce: float = 0.25,
+                 tone: ToneMatrix | None = None) -> None:
         self.config = config
         self.coach = coach
         self.sources = courtroom_sources(config) + sources
@@ -416,6 +534,8 @@ class CopilotSession:
         self._busy = False
         self._closed = False
         self._cue_deadline: float | None = None
+        self._tone = tone if tone is not None else ToneMatrix(config.mode)
+        self._momentum: float = 50.0
         self.last_activity = time.monotonic()
         self._worker = threading.Thread(target=self._work, daemon=True, name="prose-copilot")
         self._worker.start()
@@ -425,6 +545,15 @@ class CopilotSession:
         with self._condition:
             return self._closed
 
+    def set_tone(self, data: dict) -> ToneMatrix:
+        tone = ToneMatrix.from_dict(self.config.mode, data)
+        with self._condition:
+            if self._closed:
+                raise ValueError("session is stopped")
+            self._tone = tone
+            self.last_activity = time.monotonic()
+        return tone
+
     def _emit(self, line: TranscriptLine, turn_id: int, status: str,
               cue: HudCue | None = None, latency_ms: int | None = None,
               error: str = "", legal_review: dict | None = None) -> HudFrame:
@@ -433,7 +562,7 @@ class CopilotSession:
         frame = HudFrame(self._seq, line, (), prompt, cue=cue, status=status,
                          turn_id=turn_id, latency_ms=latency_ms, error=error,
                          expires_at=time.time() + 15 if prompt else None,
-                         legal_review=legal_review)
+                         legal_review=legal_review, momentum_pct=round(self._momentum))
         self._cue_deadline = time.monotonic() + 15 if prompt else None
         self._frames.append(frame)
         self._condition.notify_all()
@@ -488,12 +617,13 @@ class CopilotSession:
                     self._condition.wait(timeout=remaining)
                     continue
                 turns = list(self._turns)
+                tone = self._tone
                 line = TranscriptLine(turns[-1]["speaker"], turns[-1]["text"])
                 self._pending = None
                 self._busy = True
             cue, error, review = None, "", None
             try:
-                result = self.coach.respond(self.config, turns, self.sources)
+                result = self.coach.respond(self.config, turns, self.sources, tone)
                 cue = parse_cue(result, self.config, self.sources)
                 review = result.get("legal_review")
             except CopilotError as exc:
@@ -508,6 +638,9 @@ class CopilotSession:
                     return
                 if turn_id != self._turn_id:
                     continue
+                if cue is not None:
+                    target = max(0, min(100, 50 + cue.momentum_signal * 25))
+                    self._momentum = 0.7 * self._momentum + 0.3 * target
                 age = time.monotonic() - submitted
                 if age >= self.max_age:
                     self._emit(line, turn_id, "expired", latency_ms=round(age * 1000),

@@ -1,9 +1,12 @@
 # MemoMind One display relay
 
 This PhoneSDK Web plugin takes ProSe's compact cue stream and uses the official
-`gm.display` API to show one short suggestion. It coalesces display updates,
-clears on a null cue, and expires cues locally if the service disconnects. It
-contains no AI keys and sends no case documents to the glasses.
+`gm.display` API to show one short suggestion, plus the speaking turn's mood
+and a session momentum meter. It coalesces display updates, persists the
+current cue until the next `status: "ready"` frame replaces or clears it
+(rather than on a timer), and clears if the session ends or the connection is
+lost for a sustained period. It contains no AI keys and sends no case
+documents to the glasses.
 
 The SDK methods and manifest follow the public MemoMind contract checked on
 2026-10-01. This is source for a device integration, **not a hardware-verified
@@ -26,8 +29,14 @@ The checked revision is `5a1f34ae2430821e30ada9d46bda84acf8fa4fba`.
   Open `http://127.0.0.1:4173`; no account is required. Select the required
   `display` and `network` permissions and start the plugin.
   Click **Show sample cue** in the ProSe panel to send an explicitly labeled
-  example to the green display. It clears after 15 seconds and makes no AI call.
+  example (with a sample mood and momentum line) to the green display. It
+  makes no AI call and stays until you disconnect or show it again.
   If the panel is empty, click Studio's **Reload** and approve the permissions.
+  The panel also offers **04 controller** (opens ProSe's `/controller` page
+  for the stream origin) and **05 matrix**, an embedded personality matrix —
+  a debate/litigation switch plus both bipolar pads that write tone/mode
+  straight to `/api/hud/menu`; navigation actions stay same-origin, so the
+  glasses menu itself can only be driven from ProSe's own pages.
 - Debate without glasses: open ProSe's `/practice` for an AI opponent and coach.
 
 The upstream Browser Studio permission dialog has hard-coded Chinese labels.
@@ -73,6 +82,11 @@ The stream URL contains a random session identifier and grants read access to
 that session. It expires when the session stops or times out. Do not share it.
 The relay leaves session creation and audio input in the ProSe companion; it
 does not request audio permission or pretend to transcribe the glasses mic.
+
+The mood label and momentum meter are playful, subjective engagement signals
+the model derives from the transcript -- not a prediction of legal merit,
+case strength, or debate outcome. Treat them the same as the cue itself:
+advisory, not independently verified.
 
 ## Audio path still to integrate on the actual device
 

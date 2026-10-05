@@ -18,6 +18,7 @@ from prose.copilot import (
     ModelSettings,
     SessionConfig,
     SourceNote,
+    ToneMatrix,
     courtroom_sources,
     parse_cue,
     rate_limit_message,
@@ -31,11 +32,13 @@ from prose.web import build_site
 def answer(**changes):
     return {"kind": "question", "headline": "Ask what evidence supports the claim.",
             "say": "What evidence supports that conclusion?", "rationale": "No evidence cited.",
-            "next_question": "", "caveat": "", "source_ids": [], **changes}
+            "next_question": "", "caveat": "", "source_ids": [],
+            "speaker_mood": {"label": "neutral", "intensity": 3}, "momentum_signal": 0,
+            **changes}
 
 
 class FakeCoach:
-    def respond(self, config, turns, sources):
+    def respond(self, config, turns, sources, tone):
         return answer()
 
 
@@ -44,7 +47,7 @@ def test_audio_turns_are_nonblocking_and_stale_answers_are_discarded():
     calls = []
 
     class SlowCoach:
-        def respond(self, config, turns, sources):
+        def respond(self, config, turns, sources, tone):
             calls.append(turns)
             if len(calls) == 1:
                 entered.set()
@@ -75,7 +78,7 @@ def test_audio_turns_are_nonblocking_and_stale_answers_are_discarded():
 
 def test_provider_failure_keeps_transcript_live_and_clears_prompt():
     class FailingCoach:
-        def respond(self, config, turns, sources):
+        def respond(self, config, turns, sources, tone):
             raise RuntimeError("secret provider internals")
 
     session = CopilotSession(SessionConfig(), FailingCoach(), debounce=0)
@@ -95,7 +98,7 @@ def test_stopping_prevents_inflight_cue_delivery():
     entered, release = threading.Event(), threading.Event()
 
     class BlockedCoach:
-        def respond(self, config, turns, sources):
+        def respond(self, config, turns, sources, tone):
             entered.set()
             release.wait(3)
             return answer()
@@ -158,10 +161,56 @@ def test_phone_bridge_payload_excludes_private_context_and_stays_small():
 @pytest.mark.parametrize("changes", [
     {"kind": "objection"}, {"source_ids": ["INVENTED-CASE"]},
     {"source_ids": "FRE-611"}, {"headline": "x" * 121}, {"kind": "not-a-cue"},
+    {"speaker_mood": {"label": "angry", "intensity": 3}},
+    {"speaker_mood": {"label": "calm", "intensity": 6}},
+    {"speaker_mood": {"label": "calm", "intensity": "3"}},
+    {"speaker_mood": None}, {"momentum_signal": 5}, {"momentum_signal": None},
 ])
 def test_unsubstantiated_or_invalid_cues_are_rejected(changes):
     with pytest.raises(CopilotError):
         parse_cue(answer(**changes), SessionConfig(), ())
+
+
+def test_mood_and_momentum_tolerate_whole_number_floats_from_the_model():
+    # LLM JSON generation isn't always consistent about int vs float formatting
+    # (e.g. 3.0 instead of 3); a whole-number float should still be accepted.
+    cue = parse_cue(answer(speaker_mood={"label": "tense", "intensity": 4.0},
+                           momentum_signal=-1.0), SessionConfig(), ())
+    assert cue.mood_intensity == 4 and cue.momentum_signal == -1
+    with pytest.raises(CopilotError):
+        parse_cue(answer(speaker_mood={"label": "tense", "intensity": 4.5}),
+                  SessionConfig(), ())
+    with pytest.raises(CopilotError):
+        parse_cue(answer(speaker_mood={"label": "tense", "intensity": True}),
+                  SessionConfig(), ())
+
+
+def test_mood_and_momentum_are_carried_even_without_a_cue():
+    cue = parse_cue(answer(kind="none"), SessionConfig(), ())
+    assert cue.headline == "" and cue.mood_label == "neutral" and cue.mood_intensity == 3
+    assert cue.momentum_signal == 0
+    tense = parse_cue(answer(speaker_mood={"label": "tense", "intensity": 5},
+                             momentum_signal=-2), SessionConfig(), ())
+    assert tense.mood_label == "tense" and tense.mood_intensity == 5
+    assert tense.momentum_signal == -2
+
+
+def test_set_tone_applies_to_next_snapshot_and_rejects_bad_input():
+    session = CopilotSession(SessionConfig(), FakeCoach(), debounce=0)
+    try:
+        assert session._tone == ToneMatrix("debate")
+        updated = session.set_tone({"humor": 4, "rhetoric": 1})
+        assert updated == ToneMatrix("debate", (4, 1, 2, 2))
+        assert session._tone == updated
+        with pytest.raises(ValueError):
+            session.set_tone({"humor": 9})
+        with pytest.raises(ValueError):
+            session.set_tone({"directness": 3})  # a litigation trait, not a debate one
+        assert session._tone == updated  # a rejected update must not disturb the prior tone
+    finally:
+        session.close()
+    with pytest.raises(ValueError, match="stopped"):
+        session.set_tone({"humor": 1})
 
 
 def test_authorities_are_scoped_and_evidence_is_not_treated_as_law():
@@ -229,7 +278,7 @@ def test_truncated_and_rate_limited_model_responses_fail_cleanly(finish_reason, 
     with model_server(finish_reason=finish_reason, status=status) as (url, _):
         coach = ModelCoach(ModelSettings(url, "test-model", "do-not-leak"))
         with pytest.raises(CopilotError) as exc:
-            coach.respond(SessionConfig(), [], ())
+            coach.respond(SessionConfig(), [], (), ToneMatrix())
         assert "do-not-leak" not in str(exc.value)
 
 
@@ -326,6 +375,21 @@ def test_live_coach_http_session_sse_and_device_payload(monkeypatch, tmp_path):
             created = post("/api/copilot/sessions", {"mode": "debate", "goal": "Discuss transport"})
             session_id = created["session_id"]
             session = site.app.copilot.get(session_id)
+            # A new session is primed with the launcher's debate matrix.
+            assert session._tone.as_payload() == site.app.launcher.tone_for("debate")
+            toned = post("/api/copilot/tone", {"session_id": session_id,
+                                               "tone": {"humor": 4}})
+            assert toned == {"tone": {**site.app.launcher.tone_for("debate"), "humor": 4},
+                             "mode": "debate"}
+            assert site.app.launcher.tones["debate"]["humor"] == 4
+            pushed = post("/api/hud/menu", {"action": "tone", "mode": "debate",
+                                            "tone": {"humor": 1, "attack": 3}})
+            assert pushed["tone"]["humor"] == 1
+            assert session._tone.as_payload()["humor"] == 1
+            assert session._tone.as_payload()["attack"] == 3
+            # The push only reaches sessions of that mode.
+            assert site.app.copilot.apply_tone({"directness": 4}, "litigation") == 0
+            assert site.app.copilot.apply_tone({"listening": 0}, "debate") == 1
             posted = post("/api/copilot/turn", {"session_id": session_id,
                                                 "speaker": "Opponent", "text": "Cars are best."})
             assert posted["frame"]["status"] == "thinking"

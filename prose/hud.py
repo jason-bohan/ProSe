@@ -34,6 +34,9 @@ class HudCue:
     rationale: str
     next_question: str
     caveat: str
+    mood_label: str = ""
+    mood_intensity: int = 0
+    momentum_signal: int = 0
     sources: tuple[dict, ...] = ()
 
 
@@ -50,6 +53,7 @@ class HudFrame:
     error: str = ""
     expires_at: float | None = None
     legal_review: dict | None = None
+    momentum_pct: int | None = None
 
 
 def load_rules() -> tuple[dict, ...]:

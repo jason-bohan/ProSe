@@ -58,6 +58,20 @@ class CopilotHub:
                 raise KeyError("session expired after 30 minutes without a transcript")
             return session
 
+    def apply_tone(self, tone: dict, mode: str | None = None) -> int:
+        """Best-effort: push one mode's tone dict to its open sessions; returns the count."""
+        with self._lock:
+            sessions = [s for s in self._sessions.values()
+                        if mode is None or s.config.mode == mode]
+        applied = 0
+        for session in sessions:
+            try:
+                session.set_tone(tone)
+                applied += 1
+            except ValueError:
+                continue  # closed between the snapshot and the write
+        return applied
+
     def stop(self, session_id: str) -> None:
         with self._lock:
             session = self._sessions.pop(session_id, None)
@@ -73,19 +87,37 @@ class CopilotHub:
 
 COPILOT_CSS = """
 .coach-grid{display:grid;grid-template-columns:minmax(280px,1fr) minmax(300px,1.3fr);gap:1.25rem}
-.coach-grid .card{margin:0 0 1.25rem}.lens{background:#0b161b;color:#c3f8e0;
-min-height:230px;padding:1.5rem;border:1px solid #244337;border-radius:18px}
-.lens-label{font:12px ui-monospace,monospace;letter-spacing:.1em;color:#87b4a7}
-.lens h2{font-size:1.6rem;font-weight:400;line-height:1.3;margin:1.25rem 0}
-.lens p{font-size:.9rem;color:#a7c7bc}.coach-help{font-size:.85rem;color:var(--g9)}
+.coach-grid .card{margin:0 0 1.25rem}.lens{background:var(--k);color:var(--tw);
+min-height:230px;padding:1.5rem;border:1px solid var(--k);border-radius:0}
+.lens-label{font:12px ui-monospace,monospace;letter-spacing:.1em;color:var(--o)}
+.lens h3{font-size:1.6rem;font-weight:700;line-height:1.3;margin:1.25rem 0;color:var(--tw)}
+.lens p{font-size:.9rem;color:#9a9a9a}.coach-help{font-size:.85rem;color:var(--g9)}
 .coach-grid label.check{display:flex;gap:.5rem;align-items:center;text-transform:none}
 .coach-grid button:disabled{opacity:.4;cursor:default}.coach-grid [hidden]{display:none}
 .transcript-log{max-height:300px;overflow:auto;white-space:pre-wrap;font-size:.85rem}
 .transcript-log p{border-bottom:1px solid var(--g1);padding-bottom:.5rem}
-.source-list a{display:block}.coach-grid :focus-visible{outline:2px solid var(--b);outline-offset:3px}
-.coach-grid textarea.short{min-height:85px}.coach-grid .row-pair{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
-@media(max-width:760px){.coach-grid{grid-template-columns:1fr}.container{padding:1rem}}
-"""
+.source-list a{display:block}.coach-grid :focus-visible{outline:2px solid var(--o);outline-offset:3px}
+ .coach-grid textarea.short{min-height:85px}.coach-grid .row-pair{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+ .matrix{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+ .xy{display:grid;gap:.35rem;min-width:0}
+ .xy-head{font-size:.75rem;letter-spacing:.05em;color:var(--g9)}
+ .xy-grid{position:relative;aspect-ratio:1;border:1px solid var(--g1);border-radius:12px;
+  background:#0c0c0c;touch-action:none;cursor:crosshair;overflow:hidden;
+  background-image:repeating-linear-gradient(0deg,transparent 0 calc(25% - 1px),
+  #1e1e1e calc(25% - 1px) 25%),repeating-linear-gradient(90deg,transparent 0 calc(25% - 1px),
+  #1e1e1e calc(25% - 1px) 25%)}
+ .xy-grid::before{content:"";position:absolute;left:0;right:0;top:var(--y,50%);height:1px;
+  background:#ffffff26;pointer-events:none}
+ .xy-grid::after{content:"";position:absolute;top:0;bottom:0;left:var(--x,50%);width:1px;
+  background:#ffffff26;pointer-events:none}
+ .xy-dot{position:absolute;width:.95rem;height:.95rem;border-radius:50%;background:var(--o);
+  left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;
+  box-shadow:0 0 0 2px #00000099,0 0 8px #ff5a2488}
+ .xy:active .xy-grid{border-color:var(--o)}
+ .xy-val{font:12px ui-monospace,monospace;color:var(--g)}
+ #tone-controls:disabled .xy-grid{opacity:.45;cursor:default}
+ @media(max-width:760px){.coach-grid{grid-template-columns:1fr}.container{padding:1rem}}
+ """
 
 COPILOT_JS = r"""
 (() => {
@@ -93,6 +125,17 @@ COPILOT_JS = r"""
   const $ = id => document.getElementById(id);
   let session = null, stream = null, lastSeq = 0, lastTurn = 0, recognition = null;
   let starting = false, stopping = false, expiry = null, posting = false;
+  const TRAITS = {debate: ['humor', 'rhetoric', 'attack', 'listening'],
+                  litigation: ['directness', 'formality', 'encouragement', 'urgency']};
+  let tone = {debate: {humor: 2, rhetoric: 2, attack: 2, listening: 2},
+              litigation: {directness: 2, formality: 2, encouragement: 2, urgency: 2}};
+  let tonePoles = {debate: {}, litigation: {}};
+  let toneMode = 'debate', toneTimer = null;
+  function adoptTone(snap) {
+    if (!snap) return;
+    if (snap.tones) tone = snap.tones;
+    if (snap.tone_poles) tonePoles = snap.tone_poles;
+  }
   const notice = text => { $('notice').textContent = text; };
   async function api(path, data) {
     const response = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json'},
@@ -100,6 +143,73 @@ COPILOT_JS = r"""
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || 'Request failed');
     return result;
+  }
+  function renderTone() {
+    const traits = TRAITS[toneMode];
+    const values = tone[toneMode];
+    const labels = tonePoles[toneMode] || {};
+    $('tone-mode-label').textContent = toneMode;
+    for (const pair of [['xy-a', 0, 1], ['xy-b', 2, 3]]) {
+      const el = $(pair[0]), fx = traits[pair[1]], fy = traits[pair[2]];
+      el.dataset.x = fx; el.dataset.y = fy;
+      const gx = (values[fx] / 4) * 100, gy = (1 - values[fy] / 4) * 100;
+      const grid = el.querySelector('.xy-grid');
+      grid.style.setProperty('--x', gx + '%');
+      grid.style.setProperty('--y', gy + '%');
+      const dot = el.querySelector('.xy-dot');
+      dot.style.left = gx + '%';
+      dot.style.top = gy + '%';
+      const xl = labels[fx] || [fx, fx], yl = labels[fy] || [fy, fy];
+      el.querySelector('.xy-head').textContent =
+        xl[0] + ' \u2194 ' + xl[1] + ' \u00d7 ' + yl[0] + ' \u2194 ' + yl[1];
+      $(pair[0] + '-val').textContent =
+        'x ' + values[fx] + '/4 \u00b7 y ' + values[fy] + '/4';
+    }
+  }
+  async function syncTone() {
+    if (!session) return;
+    try {
+      await api('/api/hud/menu', {action: 'tone', mode: toneMode,
+        tone: Object.assign({}, tone[toneMode])});
+    }
+    catch (err) { notice(err.message); }
+  }
+  function scheduleToneSync() {
+    clearTimeout(toneTimer);
+    toneTimer = setTimeout(syncTone, 140);
+  }
+  function bindPad(id) {
+    const el = $(id);
+    const grid = el.querySelector('.xy-grid');
+    let dragging = false;
+    const apply = event => {
+      if ($('tone-controls').disabled) return;
+      const rect = grid.getBoundingClientRect();
+      const px = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+      const py = Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height));
+      const nx = Math.round(px * 4);
+      const ny = 4 - Math.round(py * 4);
+      const fx = el.dataset.x, fy = el.dataset.y;
+      const values = tone[toneMode];
+      if (values[fx] !== nx || values[fy] !== ny) {
+        values[fx] = nx; values[fy] = ny;
+        renderTone(); scheduleToneSync();
+      }
+    };
+    grid.addEventListener('pointerdown', event => {
+      dragging = true;
+      grid.setPointerCapture(event.pointerId);
+      apply(event);
+      event.preventDefault();
+    });
+    grid.addEventListener('pointermove', event => { if (dragging) apply(event); });
+    grid.addEventListener('pointerup', () => {
+      if (!dragging) return;
+      dragging = false;
+      clearTimeout(toneTimer);
+      syncTone();
+    });
+    grid.addEventListener('pointercancel', () => { dragging = false; });
   }
   function clearCue(text) {
     clearTimeout(expiry);
@@ -161,6 +271,7 @@ COPILOT_JS = r"""
     $('stop').disabled = !active || stopping;
     $('send').disabled = !active || posting;
     $('mic').disabled = !active || !Speech;
+    $('tone-controls').disabled = !active;
   }
   $('config-form').addEventListener('submit', async event => {
     event.preventDefault(); if (session || starting || stopping) return;
@@ -173,6 +284,9 @@ COPILOT_JS = r"""
       session = result.session_id; lastSeq = lastTurn = 0;
       $('memo-link').value = location.origin + '/api/copilot/events?view=glasses&session_id=' + encodeURIComponent(session);
       $('transcript-log').replaceChildren(); clearCue('Ready. Add a transcript turn.');
+      toneMode = data.mode;
+      try { adoptTone(await (await fetch('/api/hud/menu')).json()); } catch (_) {}
+      renderTone();
       const expected = session;
       stream = new EventSource('/api/copilot/events?session_id=' + encodeURIComponent(session));
       stream.addEventListener('frame', event => { if (session === expected) frame(JSON.parse(event.data)); });
@@ -233,6 +347,8 @@ COPILOT_JS = r"""
   $('mode').addEventListener('change', () => {
     const litigation = $('mode').value === 'litigation';
     $('court-fields').hidden = !litigation;
+    toneMode = $('mode').value;
+    renderTone();
   });
   window.addEventListener('pagehide', () => {
     stopMic(); if (stream) stream.close();
@@ -240,7 +356,11 @@ COPILOT_JS = r"""
       headers:{'Content-Type':'application/json'}, body:JSON.stringify({session_id:session})}).catch(() => {});
   });
   if (!Speech) $('mic-help').textContent = 'Browser speech recognition is unavailable. Paste turns here or use the Vosk microphone CLI.';
-  controls(false);
+  bindPad('xy-a'); bindPad('xy-b');
+  toneMode = $('mode').value;
+  renderTone(); controls(false);
+  fetch('/api/hud/menu').then(r => r.json()).then(adoptTone).catch(() => {})
+    .finally(renderTone);
 })();
 """
 
@@ -263,8 +383,8 @@ def render_copilot_page(css: str, nav: str, status: dict, documents: list) -> st
         f'{e(item["label"])}</option>' for item in status.get("choices", [])
     )
     legal_configured = status.get("legal_specialist", {}).get("configured", False)
-    body = """<main class="coach-grid">
-<div><section class="card"><h3>Session brief</h3>
+    body = """<main id="main" class="coach-grid">
+<div><section class="card"><h2>Session brief</h2>
 <p class="coach-help">Set your position and context before you begin.</p>
 <form id="config-form"><fieldset id="settings" style="border:0;padding:0;margin:0">
 <div class="row"><label for="coach-model">Main AI coach</label><select id="coach-model" name="model_id">__MODELS__</select></div>
@@ -282,20 +402,36 @@ def render_copilot_page(css: str, nav: str, status: dict, documents: list) -> st
 <details><summary>Source documents</summary><p class="coach-help">Choose up to six. The first 3,000 characters of each are included.</p>__DOCUMENTS__</details>
 </fieldset><p class="coach-help">__MODEL__</p>
 <div class="btn-row"><button id="start" type="submit">Start session</button><button id="stop" type="button" disabled>Stop</button></div></form>
-</section><section class="card"><h3>Live transcript</h3>
+</section><section class="card"><h2>Live transcript</h2>
 <form id="turn-form"><div class="row"><label for="speaker">Current speaker</label><input id="speaker" type="text" value="Other speaker" maxlength="100" required></div>
 <div class="row"><label for="utterance">What was said</label><textarea class="short" id="utterance" maxlength="4000" required placeholder="Paste a statement or use the microphone."></textarea></div>
 <div class="btn-row"><button id="send" type="submit" disabled>Send turn</button><button id="mic" type="button" disabled>Start microphone</button></div></form>
 <p class="coach-help" id="mic-help">Microphone transcription uses your browser's speech service and may send audio to its provider. Set the speaker manually. The Vosk CLI supports local transcription.</p>
-<div id="transcript-log" class="transcript-log" aria-label="Recent transcript"></div></section></div>
-<div><section class="card"><h3>Glasses preview <span class="dim" id="latency"></span></h3>
-<div class="lens" role="status" aria-live="polite"><div class="lens-label" id="cue-kind">STANDBY</div><h2 id="cue">Listen. Think. Respond.</h2><p id="say"></p></div>
+<div id="transcript-log" class="transcript-log" aria-label="Recent transcript"></div></section>
+<section class="card"><h2>Personality matrix <span class="dim" id="tone-mode-label">debate</span></h2>
+<p class="coach-help">Drag a pad: each axis runs from its left/bottom pole to its right/top pole, 0 to 4. Follows the mode in Session brief. Style only: it never changes sourcing or evidentiary rules.</p>
+<fieldset id="tone-controls" disabled style="border:0;padding:0;margin:0">
+<div class="matrix">
+<div class="xy" id="xy-a" data-x="humor" data-y="rhetoric">
+<div class="xy-head"></div>
+<div class="xy-grid"><div class="xy-dot"></div></div>
+<div class="xy-val" id="xy-a-val"></div>
+</div>
+<div class="xy" id="xy-b" data-x="attack" data-y="listening">
+<div class="xy-head"></div>
+<div class="xy-grid"><div class="xy-dot"></div></div>
+<div class="xy-val" id="xy-b-val"></div>
+</div>
+</div>
+</fieldset></section></div>
+<div><section class="card"><h2>Glasses preview <span class="dim" id="latency"></span></h2>
+<div class="lens" role="status" aria-live="polite"><div class="lens-label" id="cue-kind">STANDBY</div><h3 id="cue">Listen. Think. Respond.</h3><p id="say"></p></div>
 <p class="coach-help">One suggested cue at a time. New speech clears the previous cue; slow responses are discarded.</p>
 <p id="notice" role="status" aria-live="polite"></p></section>
-<section class="card"><h3>Companion notes</h3><p id="rationale"></p><p id="question"></p><p id="caveat" class="coach-help"></p><div id="sources" class="source-list"></div>
+<section class="card"><h2>Companion notes</h2><p id="rationale"></p><p id="question"></p><p id="caveat" class="coach-help"></p><div id="sources" class="source-list"></div>
 <p class="coach-help">Suggestions use your recent conversation and selected sources. Source links identify supplied material; they do not certify the model's interpretation.</p></section>
-<section class="card" id="specialist-review" hidden><h3>Legal specialist review</h3><p id="specialist-status" class="coach-help"></p><p id="specialist-analysis"></p><p id="specialist-details" class="coach-help" style="white-space:pre-wrap"></p></section>
-<section class="card"><h3>Connect the glasses</h3><p>Use the microphone CLI to send the same cue frames through your JSONL or WebSocket bridge.</p>
+<section class="card" id="specialist-review" hidden><h2>Legal specialist review</h2><p id="specialist-status" class="coach-help"></p><p id="specialist-analysis"></p><p id="specialist-details" class="coach-help" style="white-space:pre-wrap"></p></section>
+<section class="card"><h2>Connect the glasses</h2><p>Use the microphone CLI to send the same cue frames through your JSONL or WebSocket bridge.</p>
 <label for="memo-link">MemoMind stream link</label><input id="memo-link" type="text" readonly style="width:100%;padding:.5rem" placeholder="Start a session to get a link">
 <p class="coach-help">Paste this private session link into the MemoMind display relay. The phone must be able to reach this server. See integrations/memomind/README.md.</p>
 <pre>prose listen --mic --model PATH_TO_VOSK_MODEL --assist debate --transport jsonl=live_hud.jsonl</pre>

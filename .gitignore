@@ -11,3 +11,5 @@ prose-hud.jsonl
 .tools/
 artifacts/
 .prose/
+integrations/memomind/glasses-hud/icons_generated.h
+integrations/memomind/glasses-hud/.build/

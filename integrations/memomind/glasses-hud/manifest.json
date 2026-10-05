@@ -1,0 +1,11 @@
+{
+  "id": "com.prose.glasses-hud",
+  "name": "ProSe Glasses HUD",
+  "version": 1,
+  "abi_version": 256,
+  "provides": {
+    "protocols": [
+      { "id": "prose.coach-hud", "version": "1.0" }
+    ]
+  }
+}

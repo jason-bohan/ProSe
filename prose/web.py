@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 import json
+import queue
 import re
 import sqlite3
 import sys
@@ -15,19 +16,21 @@ from urllib.parse import parse_qs, urlencode, urlparse
 
 from . import NOT_LEGAL_ADVICE, ingest
 from .case_import import import_case_folder
-from .copilot import CopilotError
+from .controller_web import render_controller_page
+from .copilot import CopilotError, ToneMatrix
 from .copilot_web import CopilotHub, render_copilot_page
 from .crawler import Violation, build_live_sources, collect
 from .debate import DebateConflict, DebateHub
 from .debate_web import render_practice_page
 from .device import frame_to_glasses_payload, frame_to_payload
 from .docs import render
-from .hud import HudSimulator, TranscriptLine
+from .hud import TranscriptLine
+from .hudhub import HudHub
+from .launcher import Launcher, SessionScore, practice_frame
 from .matcher import MatchResult, evaluate
 from .pipeline import (
     MIN_AUTO_CONFIDENCE,
     SAMPLE_RECORD,
-    SAMPLE_TRANSCRIPT,
     PipelineResult,
     run,
 )
@@ -92,9 +95,11 @@ def simulate_result_json(result: PipelineResult) -> dict:
 
 
 NAV = (
+    "<a class=\"skip\" href=\"#main\">skip to content</a>"
     "<nav><a href=\"/\">Dashboard</a>"
     "<a href=\"/copilot\">Live coach</a>"
     "<a href=\"/practice\">Debate practice</a>"
+    "<a href=\"/controller\">Controller</a>"
     "<a href=\"/vocabulary\">Vocabulary</a>"
     "<a href=\"/research\">Research</a>"
     "<a href=\"/documents\">Discovery</a>"
@@ -102,6 +107,25 @@ NAV = (
     "<a href=\"/live\">Collections</a>"
     "<a href=\"/exports\">Exports</a></nav>"
 )
+
+
+def mark_nav_current(page: str, path: str) -> str:
+    """Mark the nav link for the page being served, for styles and assistive
+    technology. Pages whose path is not a nav entry are returned untouched."""
+    start = page.find("<nav")
+    if start < 0:
+        return page
+    end = page.find("</nav>", start)
+    if end < 0:
+        return page
+    chunk = page[start:end]
+    needle = f'<a href="{path}">'
+    if needle not in chunk:
+        return page
+    marked = chunk.replace(
+        needle, f'<a href="{path}" aria-current="page">', 1
+    )
+    return page[:start] + marked + page[end:]
 
 DEFAULT_SUIT_QUERY = '"auto renew" class action'
 
@@ -343,55 +367,64 @@ if(f)f.addEventListener('submit',recall);});
 
 PAGE_CSS = """
 :root{--o:#f05a24;--b:#0071bb;--y:#fab413;--g:#006837;--k:#0f0e12;--w:#fff;
---tw:#f5f5f5;--g1:#e5e5e5;--g3:#b2b2b2;--g9:#4d4d4d}
+--tw:#f5f5f5;--g1:#e5e5e5;--g3:#b2b2b2;--g9:#4d4d4d;
+--face:#e4e4e4;--face2:#c7c7c7;--paper:#f5f5f5;--grey:#7f7f7f}
+html{font-size:12px}
 *{box-sizing:border-box}
-body{font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;font-weight:300;
-margin:0;background:var(--w);color:var(--k);line-height:1.5}
+body{font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;font-weight:400;
+margin:0;background:var(--face);color:var(--k);line-height:1.55}
 a{color:var(--k);text-decoration:underline;text-underline-offset:2px}
-code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--g1);
-padding:.1em .3em;border:1px solid var(--g3);font-size:.85em}
-pre{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--w);
-color:var(--k);border:1px solid var(--g3);padding:.75rem;white-space:pre-wrap;
+a:hover{color:var(--o)}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--paper);
+padding:.1em .3em;border:1px solid var(--face2);font-size:.85em}
+pre{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--k);
+color:var(--tw);border:none;padding:.75rem;white-space:pre-wrap;
 word-break:break-word;font-size:.85em}
-.container{max-width:1180px;margin:0 auto;padding:2rem 1.5rem}
+.container{max-width:1180px;margin:0 auto;padding:1.75rem 1.5rem}
 .header{display:flex;justify-content:space-between;align-items:flex-end;gap:1rem;
-border-bottom:1px solid var(--k);padding-bottom:.75rem;margin-bottom:1.5rem;
+border-bottom:2px solid var(--k);padding-bottom:.6rem;margin-bottom:1.25rem;
 flex-wrap:wrap;animation:fadein .3s ease-out both}
-.header h1{font-size:2.4rem;font-weight:300;letter-spacing:-.02em;margin:0}
+.header h1{font-size:2.2rem;font-weight:700;letter-spacing:-.02em;margin:0;
+text-transform:lowercase}
 .badge{display:inline-block;border:1px solid var(--k);background:var(--y);
 padding:.2rem .6rem;font-size:.75rem;margin-top:.35rem;
 text-transform:lowercase}
-nav a{font-size:.85rem;font-weight:300;text-decoration:none;
+nav a{font-size:.85rem;font-weight:400;text-decoration:none;
 text-transform:lowercase}
 nav a+a{margin-left:1.25rem}
 nav a:hover{text-decoration:underline}
-.card{border:1px solid var(--g3);padding:1.25rem;margin-bottom:1.25rem;
-background:var(--w);animation:rise .3s ease-out both}
+nav a[aria-current="page"]{font-weight:700;
+text-decoration:underline;text-decoration-color:var(--o);
+text-decoration-thickness:.18rem;text-underline-offset:.3rem}
+.skip{position:absolute;left:-9999px;top:0}
+.skip:focus{position:fixed;left:.75rem;top:.75rem;z-index:30;
+background:var(--o);color:var(--tw);padding:.6rem 1rem;font-weight:700;
+text-decoration:none;border:1px solid var(--k)}
+.card{border:1px solid var(--face2);padding:1.1rem;margin-bottom:1.1rem;
+background:var(--paper);animation:rise .3s ease-out both}
 .card:nth-of-type(2){animation-delay:.04s}
 .card:nth-of-type(3){animation-delay:.08s}
 .card:nth-of-type(4){animation-delay:.12s}
 .card:nth-of-type(n+5){animation-delay:.16s}
-.card h3{margin:0 0 .75rem;font-size:.9rem;font-weight:300;
-border-bottom:1px solid var(--g1);padding-bottom:.4rem;
+.card>h2,.card h3{margin:0 0 .75rem;font-size:.9rem;font-weight:700;
+border-bottom:1px solid var(--face2);padding-bottom:.4rem;
 text-transform:lowercase}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
 gap:.75rem}
 .card.stats{padding:.75rem}
-.stat{border:1px solid var(--k);padding:.9rem;
-transition:transform .12s ease-out,box-shadow .12s ease-out}
-.stat:hover{transform:translate(-3px,-3px);box-shadow:3px 3px 0 var(--k)}
-.stat:nth-of-type(4n+1){background:var(--o);color:var(--w)}
-.stat:nth-of-type(4n+2){background:var(--b);color:var(--w)}
-.stat:nth-of-type(4n+3){background:var(--y);color:var(--k)}
-.stat:nth-of-type(4n+4){background:var(--g);color:var(--w)}
-.stat .n{font-size:2.4rem;font-weight:400;line-height:1}
-.stat .l{font-size:.7rem;margin-top:.35rem;text-transform:lowercase}
-table{width:100%;border-collapse:collapse;font-size:.85rem}
-th,td{text-align:left;padding:.5rem .6rem;border:1px solid var(--g3)}
-th{background:var(--k);color:var(--tw);font-weight:300;font-size:.8rem;
+.stat{border:1px solid var(--k);padding:.9rem;background:var(--paper);
+transition:transform .1s ease-out,box-shadow .1s ease-out}
+.stat:hover{transform:translate(-2px,-2px);box-shadow:2px 2px 0 var(--k)}
+.stat .n{font-size:2.4rem;font-weight:700;line-height:1}
+.stat .l{font-size:.7rem;margin-top:.35rem;text-transform:lowercase;
+color:var(--grey)}
+table{width:100%;border-collapse:collapse;font-size:.85rem;background:var(--paper)}
+th,td{text-align:left;padding:.5rem .6rem;border:none;
+border-bottom:1px solid var(--g1)}
+th{background:var(--k);color:var(--tw);font-weight:700;font-size:.8rem;
 text-transform:lowercase}
-tr:hover td{background:var(--tw)}
-.chip{display:inline-block;border:1px solid var(--g3);background:var(--w);
+tr:hover td{background:var(--face)}
+.chip{display:inline-block;border:1px solid var(--face2);background:var(--paper);
 padding:.05rem .45rem;font-size:.7rem;text-transform:lowercase}
 .warning{background:var(--y);border:1px solid var(--k);padding:.75rem;
 margin:.6rem 0}
@@ -403,20 +436,20 @@ text-transform:lowercase}
 .suit:last-child{border-bottom:none}
 .btn-row{display:flex;gap:.5rem;align-items:center;margin:.5rem 0}
 details{margin:.4rem 0;border-top:1px solid var(--g1);padding-top:.4rem}
-details>summary{cursor:pointer;font-weight:400;font-size:.9rem}
+details>summary{cursor:pointer;font-weight:700;font-size:.9rem}
 form .row{margin:.5rem 0}
-form label{display:block;font-size:.8rem;font-weight:300;margin-bottom:.25rem;
-text-transform:lowercase}
+form label{display:block;font-size:.8rem;font-weight:400;margin-bottom:.25rem;
+text-transform:lowercase;color:var(--grey)}
 form input[type=text],form textarea{
 width:100%;background:var(--w);border:1px solid var(--g3);color:var(--k);
-padding:.5rem;border-radius:0;font-size:.9rem;font-weight:300;
+padding:.5rem;border-radius:0;font-size:.9rem;font-weight:400;
 font-family:ui-monospace,Menlo,Consolas,monospace}
 form textarea{min-height:140px}
 form select{width:100%;background:var(--w);border:1px solid var(--g3);
 color:var(--k);padding:.5rem;border-radius:0;font-size:.9rem;
 font-family:inherit}
 .btn-row input{flex:1;min-width:0}
-#graph{border:1px solid var(--g1);padding:.5rem;overflow:hidden}
+#graph{border:1px solid var(--face2);padding:.5rem;overflow:hidden;background:var(--paper)}
 #graph svg{display:block}
 #rr p{margin:.4rem 0}
 .barrow{display:flex;align-items:center;gap:.6rem;margin:.35rem 0;
@@ -429,36 +462,38 @@ font-size:.8rem}
 align-items:center;justify-content:center;z-index:20;opacity:0;
 transition:opacity .15s;pointer-events:none}
 .modal.open{opacity:1;pointer-events:auto}
-.modalbox{background:var(--w);border:1px solid var(--k);
+.modalbox{background:var(--paper);border:2px solid var(--k);
 width:min(720px,92vw);max-height:84vh;overflow:auto;padding:1.25rem}
 .modalhead{display:flex;justify-content:space-between;align-items:baseline;
-gap:1rem;border-bottom:1px solid var(--g1);padding-bottom:.5rem;
+gap:1rem;border-bottom:1px solid var(--face2);padding-bottom:.5rem;
 margin-bottom:.75rem}
-.modalhead h3{margin:0;font-weight:300;font-size:1.15rem}
+.modalhead h2{margin:0;font-weight:700;font-size:1.15rem}
 .mclose{background:none;border:none;font-size:1.5rem;cursor:pointer;
 padding:0 .3rem;line-height:1}
 .btn{display:inline-block;background:var(--k);color:var(--tw);
-padding:.55rem 1.2rem;font-size:.85rem;font-weight:300;
+padding:.55rem 1.2rem;font-size:.85rem;font-weight:400;
 text-transform:lowercase;text-decoration:none}
-.btn:hover{opacity:.7}
-form input:focus,form textarea:focus{outline:none;border-color:var(--b)}
+.btn:hover{background:#26262c;opacity:1}
+form input:focus,form textarea:focus,form select:focus{outline:2px solid var(--o);
+outline-offset:1px;border-color:var(--k)}
 button{background:var(--k);color:var(--tw);border:none;border-radius:0;
-padding:.55rem 1.2rem;cursor:pointer;font-size:.85rem;font-weight:300;
-font-family:inherit;text-transform:lowercase}
-button:hover{opacity:.7}
+padding:.55rem 1.2rem;min-height:36px;cursor:pointer;font-size:.85rem;
+font-weight:400;font-family:inherit;text-transform:lowercase}
+button:hover{background:#26262c;opacity:1}
+button:active{background:var(--o);color:var(--w)}
 .hud{background:var(--k);border:1px solid var(--k);padding:1rem;min-height:200px;
 font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.8rem;
 line-height:1.7;color:var(--tw);overflow:hidden}
 .hud div{animation:slidein .25s ease-out both}
 .hud .seq{color:#767676}
-.hud .spk{color:var(--y);font-weight:400}
+.hud .spk{color:var(--y);font-weight:700}
 .hud .txt{color:var(--tw)}
 .hud .obj{color:var(--o);margin-left:1rem}
 .hud .prm{color:#4cc38a;margin-left:1rem}
 .live-dot{display:inline-block;width:.55em;height:.55em;background:var(--o);
 border-radius:50%;margin-left:.4rem;vertical-align:middle}
 footer{text-align:center;font-size:.7rem;margin-top:2rem;padding-top:1rem;
-border-top:1px solid var(--g3);text-transform:lowercase}
+border-top:1px solid var(--face2);text-transform:lowercase;color:var(--grey)}
 @keyframes fadein{from{opacity:0}to{opacity:1}}
 @keyframes rise{from{opacity:0;transform:translateY(10px)}
 to{opacity:1;transform:translateY(0)}}
@@ -525,7 +560,9 @@ def render_dashboard(result: PipelineResult) -> str:
     e = html.escape
     parts = [
         "<!doctype html>",
-        "<html><head><meta charset=\"utf-8\"><title>LexGlasses Dashboard</title>",
+        "<html lang=\"en\"><head><meta charset=\"utf-8\">"
+        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+        "<title>Dashboard · LexGlasses</title>",
         f"<style>{PAGE_CSS}</style>",
         f"<script>{HUD_JS}</script>",
         "</head><body>",
@@ -534,6 +571,7 @@ def render_dashboard(result: PipelineResult) -> str:
         "<div><h1>LexGlasses</h1><div class=\"badge\">Project JusticeStack \u2014 simulation, not legal advice</div></div>",
         NAV,
         "</header>",
+        "<main id=\"main\">",
         "<section class=\"card stats\">",
         f"<div class=\"stat\"><div class=\"n\">{result.total_violations}</div><div class=\"l\">records collected</div></div>",
         f"<div class=\"stat\"><div class=\"n\">{len(result.matches)}</div><div class=\"l\">auto matches (\u2265 {MIN_AUTO_CONFIDENCE:.2f})</div></div>",
@@ -548,13 +586,13 @@ def render_dashboard(result: PipelineResult) -> str:
         ("draft documents", len(result.drafts), "#f05a24"),
     )
     biggest = max(value for _, value, _ in overview) or 1
-    parts.append("<section class=\"card\"><h3>Claims overview</h3>")
+    parts.append("<section class=\"card\"><h2>Claims overview</h2>")
     for label, value, color in overview:
         parts.append(_bar(label, value, biggest, color))
     parts.append("</section>")
 
     if result.matches:
-        parts.append("<section class=\"card\"><h3>Matched claims</h3><table>")
+        parts.append("<section class=\"card\"><h2>Matched claims</h2><table>")
         parts.append("<tr><th>Violation ID</th><th>Program</th><th>Source</th><th>Claim</th><th>Confidence</th></tr>")
         for m in result.matches:
             v = m.violation
@@ -566,7 +604,7 @@ def render_dashboard(result: PipelineResult) -> str:
         parts.append("</table></section>")
 
     if result.review:
-        parts.append("<section class=\"card\"><h3>Held for Human Review</h3>")
+        parts.append("<section class=\"card\"><h2>Held for Human Review</h2>")
         for m in result.review:
             v = m.violation
             parts.append(
@@ -580,7 +618,7 @@ def render_dashboard(result: PipelineResult) -> str:
 
     if result.case is not None:
         c = result.case
-        parts.append(f"<section class=\"card\"><h3>Case {e(c.case_number)} \u2014 {e(c.cause)}</h3>")
+        parts.append(f"<section class=\"card\"><h2>Case {e(c.case_number)} \u2014 {e(c.cause)}</h2>")
         parts.append(f"<p>Current stage: <strong>{e(c.stage)}</strong></p>")
         parts.append("<ul>")
         for day, entry in c.history:
@@ -589,20 +627,20 @@ def render_dashboard(result: PipelineResult) -> str:
 
     if result.briefing is not None:
         b = result.briefing
-        parts.append(f"<section class=\"card\"><h3>Stage Briefing: {e(b.stage)} \u2014 {e(b.title)}</h3>")
+        parts.append(f"<section class=\"card\"><h2>Stage Briefing: {e(b.stage)} \u2014 {e(b.title)}</h2>")
         parts.append("<ul>")
         for item in b.checklist:
             parts.append(f"<li>[ ] {e(item)}</li>")
         parts.append(f"</ul><p class=\"warning\">{e(b.caution)}</p></section>")
 
     if result.tags is not None:
-        parts.append("<section class=\"card\"><h3>Issues &amp; entities</h3><pre>")
+        parts.append("<section class=\"card\"><h2>Issues &amp; entities</h2><pre>")
         for line in result.tags.summary().splitlines():
             parts.append(e(line))
         parts.append("</pre></section>")
 
     if result.drafts:
-        parts.append("<section class=\"card\"><h3>Draft Documents</h3>")
+        parts.append("<section class=\"card\"><h2>Draft Documents</h2>")
         for vid, d in result.drafts:
             parts.append(
                 f"<details><summary>[<code>{e(vid)}</code>] {e(d.doc_type)} \u2192 {e(d.document_id)}</summary>"
@@ -610,10 +648,11 @@ def render_dashboard(result: PipelineResult) -> str:
             )
         parts.append("</section>")
 
-    parts.append("<section class=\"card\"><h3>Glasses HUD \u2014 live transcript"
-                 "<span class=\"live-dot\"></span></h3>")
+    parts.append("<section class=\"card\"><h2>Glasses HUD \u2014 live transcript"
+                 "<span class=\"live-dot\"></span></h2>")
     parts.append("<div id=\"hud\" class=\"hud\"></div></section>")
 
+    parts.append("</main>")
     parts.append("<footer>DISCLAIMER: simulation output only. Not legal advice; not for filing.</footer>")
     parts.append("</div></body></html>")
     return "\n".join(parts)
@@ -630,7 +669,9 @@ def render_live_page(
         options.append(f"<option value=\"{name}\"{selected}>{name}</option>")
     parts = [
         "<!doctype html>",
-        "<html><head><meta charset=\"utf-8\"><title>Collections \u2014 LexGlasses</title>",
+        "<html lang=\"en\"><head><meta charset=\"utf-8\">"
+        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+        "<title>Collections · LexGlasses</title>",
         f"<style>{PAGE_CSS}</style>",
         "</head><body>",
         "<div class=\"container\">",
@@ -639,8 +680,9 @@ def render_live_page(
         "<div class=\"badge\">public esi \u2192 cfpb \u00b7 recap \u00b7 ftc</div></div>",
         NAV,
         "</header>",
+        "<main id=\"main\">",
         "<section class=\"card\">",
-        "<h3>Collect from public sources</h3>",
+        "<h2>Collect from public sources</h2>",
         "<form method=\"GET\" action=\"/live\">",
         "<div class=\"row\"><label>source</label>"
         f"<select name=\"source\">{''.join(options)}</select></div>",
@@ -652,7 +694,7 @@ def render_live_page(
         "</form>",
         "</section>",
         "<section class=\"card\">",
-        "<h3>Load case files (SD card / folder / zip)</h3>",
+        "<h2>Load case files (SD card / folder / zip)</h2>",
         "<form method=\"POST\" action=\"/import\">",
         "<div class=\"row\"><label>path on this machine</label>",
         "<input type=\"text\" name=\"path\" required "
@@ -664,12 +706,13 @@ def render_live_page(
         ".txt .md .json .jsonl .csv .pdf is read, coded, and wikilinked. "
         "hidden and system folders are skipped.</p>",
         "</section>",
-        f"<section class=\"card\"><p>source: <strong>{e(source)}</strong> {mdash} "
+        f"<section class=\"card\"><h2>Collection summary</h2>"
+        f"<p>source: <strong>{e(source)}</strong> {mdash} "
         f"terms: {e(query) if query else '(any)'} {mdash} limit: {limit}</p>",
         f"<p>collected <strong>{len(violations)}</strong> record(s).</p></section>",
     ]
     if violations:
-        parts.append("<section class=\"card\"><h3>Violations</h3>")
+        parts.append("<section class=\"card\"><h2>Violations</h2>")
         for v in violations:
             rules = ", ".join(r["type"] for r in v.rules) or "none"
             parts.append(
@@ -680,9 +723,11 @@ def render_live_page(
         parts.append("</section>")
     else:
         parts.append(
-            "<section class=\"card\"><p>No records collected for these parameters.</p></section>"
+            "<section class=\"card\"><h2>Violations</h2>"
+            "<p>No records collected for these parameters.</p></section>"
         )
 
+    parts.append("</main>")
     parts.append("<footer>DISCLAIMER: live data from public sources. Not legal advice.</footer>")
     parts.append("</div></body></html>")
     return "\n".join(parts)
@@ -742,7 +787,9 @@ def render_documents_page(
     count_word = "document" if len(records) == 1 else "documents"
     parts = [
         "<!doctype html>",
-        "<html><head><meta charset=\"utf-8\"><title>Discovery \u2014 LexGlasses</title>",
+        "<html lang=\"en\"><head><meta charset=\"utf-8\">"
+        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+        "<title>Discovery · LexGlasses</title>",
         f"<style>{PAGE_CSS}</style>",
         f"<script>window.GRAPH={graph_json};</script>",
         f"<script>window.DOCS={docs_json};</script>",
@@ -754,6 +801,7 @@ def render_documents_page(
         "<div class=\"badge\">review set \u2192 issue codes \u2192 recall</div></div>",
         NAV,
         "</header>",
+        "<main id=\"main\">",
     ]
     if notice:
         parts.append(f"<div class=\"warning\">{e(notice)}</div>")
@@ -764,7 +812,7 @@ def render_documents_page(
         )
     parts += [
         "<section class=\"card\">",
-        "<h3>Add document to review set</h3>",
+        "<h2>Add document to review set</h2>",
         "<form method=\"POST\" action=\"/documents\">",
         "<div class=\"row\"><label>description</label>"
         "<input type=\"text\" name=\"name\" "
@@ -777,7 +825,7 @@ def render_documents_page(
         "</form>",
         "</section>",
         "<section class=\"card\">",
-        "<h3>Recall</h3>",
+        "<h2>Recall</h2>",
         "<p class=\"dim\">keyword search across the review set and collected "
         "records \u2014 surface responsive documents.</p>",
         "<form id=\"recallForm\" class=\"btn-row\">",
@@ -789,6 +837,7 @@ def render_documents_page(
     ]
     if records:
         parts.append("<section class=\"card\">")
+        parts.append("<h2>Review set</h2>")
         parts.append(
             f"<p><span id=\"count\">{len(records)} {count_word} in review set</span>"
             " \u00b7 refreshed <span id=\"ago\">just now</span></p>"
@@ -826,7 +875,7 @@ def render_documents_page(
             for kw in rec.tags.keywords:
                 counts[kw] = counts.get(kw, 0) + 1
         if counts:
-            parts.append("<section class=\"card\"><h3>Issues in the review set</h3>")
+            parts.append("<section class=\"card\"><h2>Issues in the review set</h2>")
             top = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
             for kw, n in top:
                 parts.append(_bar(kw, n, top[0][1], "#f05a24"))
@@ -834,6 +883,7 @@ def render_documents_page(
     else:
         parts.append(
             "<section class=\"card\">"
+            "<h2>Review set</h2>"
             "<p>No documents yet \u2014 the review set is empty. link documents "
             "with <code>[[double brackets]]</code> to build the graph.</p>"
             "<div class=\"btn-row\">"
@@ -845,7 +895,7 @@ def render_documents_page(
             "</section>"
         )
     parts.append("<section class=\"card\">")
-    parts.append("<h3>Graph \u2014 review set links</h3>")
+    parts.append("<h2>Graph \u2014 review set links</h2>")
     parts.append(
         "<p class=\"dim\">[[wikilinks]] between documents; dashed = unresolved; "
         "green = class action. hover to spotlight a neighborhood, "
@@ -862,12 +912,13 @@ def render_documents_page(
     parts.append(
         "<div id=\"modal\" class=\"modal\">"
         "<div class=\"modalbox\">"
-        "<div class=\"modalhead\"><h3 id=\"mtitle\"></h3>"
+        "<div class=\"modalhead\"><h2 id=\"mtitle\"></h2>"
         "<button type=\"button\" class=\"mclose\" id=\"mclose\" "
         "aria-label=\"close\">&times;</button></div>"
         "<p id=\"mmeta\"></p><p id=\"mchips\"></p><div id=\"mbody\"></div>"
         "</div></div>"
     )
+    parts.append("</main>")
     parts.append(
         "<footer>DISCLAIMER: the review set is held in memory for this session "
         "only. Not legal advice.</footer>"
@@ -888,7 +939,9 @@ def render_suits_page(
     joined_ids = {j["violation_id"] for j in joins}
     parts = [
         "<!doctype html>",
-        "<html><head><meta charset=\"utf-8\"><title>Class actions</title>",
+        "<html lang=\"en\"><head><meta charset=\"utf-8\">"
+        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+        "<title>Class actions · LexGlasses</title>",
         f"<style>{PAGE_CSS}</style>",
         "</head><body>",
         "<div class=\"container\">",
@@ -897,11 +950,13 @@ def render_suits_page(
         "<div class=\"badge\">search RECAP \u2192 match your record \u2192 draft joinder</div></div>",
         NAV,
         "</header>",
+        "<main id=\"main\">",
     ]
     if notice:
         parts.append(f"<div class=\"warning\">{e(notice)}</div>")
     parts += [
         "<section class=\"card\">",
+        "<h2>Search RECAP dockets</h2>",
         "<form method=\"GET\" action=\"/suits\">",
         "<div class=\"row\"><label>search terms</label>"
         f"<input type=\"text\" name=\"query\" value=\"{e(effective)}\"></div>",
@@ -915,7 +970,7 @@ def render_suits_page(
         f"your record at confidence \u2265 {MIN_AUTO_CONFIDENCE:.2f}; the rest "
         "stay in review.</p>",
         "</section>",
-        f"<section class=\"card\"><h3>Discovered suits ({len(violations)})</h3>",
+        f"<section class=\"card\"><h2>Discovered suits ({len(violations)})</h2>",
     ]
     if not violations:
         parts.append("<p>No suits found for this query.</p>")
@@ -959,7 +1014,7 @@ def render_suits_page(
         parts.append("</div>")
     parts.append("</section>")
     if joins:
-        parts.append("<section class=\"card\"><h3>Joinders (drafts)</h3>")
+        parts.append("<section class=\"card\"><h2>Joinders (drafts)</h2>")
         for j in joins:
             auto_chip = "<span class=\"chip\">auto</span>" if j.get("auto") else ""
             parts.append(
@@ -969,9 +1024,10 @@ def render_suits_page(
                 f"</summary><pre>{e(j['draft'])}</pre></details>"
             )
         parts.append("</section>")
+    parts.append("</main>")
     parts.append(
         "<footer>DISCLAIMER: drafts only; verify class membership and "
-        "deadlines with counsel.</footer>"
+        "deadlines with counsel. Not legal advice.</footer>"
     )
     parts.append("</div></body></html>")
     return "\n".join(parts)
@@ -997,7 +1053,9 @@ def render_exports_page(result: PipelineResult) -> str:
     e = html.escape
     parts = [
         "<!doctype html>",
-        "<html><head><meta charset=\"utf-8\"><title>Exports \u2014 LexGlasses</title>",
+        "<html lang=\"en\"><head><meta charset=\"utf-8\">"
+        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+        "<title>Exports · LexGlasses</title>",
         f"<style>{PAGE_CSS}</style>",
         "</head><body>",
         "<div class=\"container\">",
@@ -1006,7 +1064,8 @@ def render_exports_page(result: PipelineResult) -> str:
         "<div class=\"badge\">productions for your records \u2192 json</div></div>",
         NAV,
         "</header>",
-        "<section class=\"card\"><h3>Available productions</h3>",
+        "<main id=\"main\">",
+        "<section class=\"card\"><h2>Available productions</h2>",
     ]
     for href, filename, open_href, title, desc in EXPORT_ITEMS:
         parts.append(
@@ -1022,10 +1081,11 @@ def render_exports_page(result: PipelineResult) -> str:
     parts.append("</section>")
     payload = e(json.dumps(simulate_result_json(result), indent=2))
     parts.append(
-        "<section class=\"card\"><h3>Preview \u2014 case file</h3>"
+        "<section class=\"card\"><h2>Preview \u2014 case file</h2>"
         "<details><summary>show formatted json</summary>"
         f"<pre>{payload}</pre></details></section>"
     )
+    parts.append("</main>")
     parts.append(
         "<footer>DISCLAIMER: exports are working records for your own files. "
         "Not legal advice.</footer>"
@@ -1039,7 +1099,9 @@ def render_case_file_page(result: PipelineResult) -> str:
     data = simulate_result_json(result)
     parts = [
         "<!doctype html>",
-        "<html><head><meta charset=\"utf-8\"><title>Case file \u2014 LexGlasses</title>",
+        "<html lang=\"en\"><head><meta charset=\"utf-8\">"
+        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+        "<title>Case file · LexGlasses</title>",
         f"<style>{PAGE_CSS}</style>",
         "</head><body>",
         "<div class=\"container\">",
@@ -1048,6 +1110,7 @@ def render_case_file_page(result: PipelineResult) -> str:
         "<div class=\"badge\">claims \u00b7 timeline \u00b7 drafts \u00b7 hearing prep</div></div>",
         NAV,
         "</header>",
+        "<main id=\"main\">",
     ]
 
     def match_card(m: dict, dim_note: str | None = None) -> None:
@@ -1063,7 +1126,7 @@ def render_case_file_page(result: PipelineResult) -> str:
             parts.append(f"<p class=\"dim\">{e(dim_note)}</p>")
         parts.append(f"<ul>{evidence}</ul></div>")
 
-    parts.append("<section class=\"card\"><h3>Matched claims</h3>")
+    parts.append("<section class=\"card\"><h2>Matched claims</h2>")
     if data["matches"]:
         for m in data["matches"]:
             match_card(m)
@@ -1072,7 +1135,7 @@ def render_case_file_page(result: PipelineResult) -> str:
     parts.append("</section>")
 
     if data["review"]:
-        parts.append("<section class=\"card\"><h3>Below threshold \u2014 in review</h3>")
+        parts.append("<section class=\"card\"><h2>Below threshold \u2014 in review</h2>")
         for m in data["review"]:
             match_card(m, f"under {data['min_auto_confidence']:.2f} \u2014 verify before filing")
         parts.append("</section>")
@@ -1080,7 +1143,7 @@ def render_case_file_page(result: PipelineResult) -> str:
     if data["case"]:
         case = data["case"]
         parts.append(
-            "<section class=\"card\"><h3>Case timeline</h3>"
+            "<section class=\"card\"><h2>Case timeline</h2>"
             f"<p><span class=\"chip\">{e(case['case_number'])}</span>"
             f"<span class=\"chip\">{e(case['stage'])}</span></p>"
             f"<p><strong>{e(case['cause'])}</strong></p>"
@@ -1095,20 +1158,20 @@ def render_case_file_page(result: PipelineResult) -> str:
         checklist = "".join(f"<li>{e(c)}</li>" for c in brief["checklist"])
         parts.append(
             "<section class=\"card\">"
-            f"<h3>Stage briefing \u2014 {e(brief['title'])}</h3>"
+            f"<h2>Stage briefing \u2014 {e(brief['title'])}</h2>"
             f"<ol>{checklist}</ol>"
             f"<p class=\"warning\">{e(brief['caution'])}</p></section>"
         )
 
     if data["tags"]:
         parts.append(
-            "<section class=\"card\"><h3>Issue codes</h3><pre>"
+            "<section class=\"card\"><h2>Issue codes</h2><pre>"
             + e("\n".join(data["tags"]))
             + "</pre></section>"
         )
 
     if data["drafts"]:
-        parts.append("<section class=\"card\"><h3>Drafts</h3>")
+        parts.append("<section class=\"card\"><h2>Drafts</h2>")
         for d in data["drafts"]:
             parts.append(
                 f"<details><summary>{e(d['doc_type'])} \u2014 "
@@ -1118,7 +1181,7 @@ def render_case_file_page(result: PipelineResult) -> str:
         parts.append("</section>")
 
     if data["frames"]:
-        parts.append("<section class=\"card\"><h3>Hearing prep \u2014 frames</h3>")
+        parts.append("<section class=\"card\"><h2>Hearing prep \u2014 frames</h2>")
         for f in data["frames"]:
             chips = "".join(
                 f"<span class=\"chip\">{e(o['label'])} {e(o['citation'])}</span>"
@@ -1133,6 +1196,7 @@ def render_case_file_page(result: PipelineResult) -> str:
             )
         parts.append("</section>")
 
+    parts.append("</main>")
     parts.append(
         "<footer>DISCLAIMER: working case file \u2014 verify every deadline and "
         "citation. Not legal advice.</footer>"
@@ -1171,6 +1235,10 @@ class WebApp:
         self.vocabulary = VocabularyStore()
         self.research = ResearchStore(self.vocabulary.directory)
         self.practice = DebateHub(self.vocabulary, self.research)
+        self.hub = HudHub()
+        self.launcher = Launcher()
+        self.scores: dict[str, SessionScore] = {}
+        self.hub.publish(self.launcher.payload())
 
     def simulate(self) -> PipelineResult:
         with self._lock:
@@ -1378,6 +1446,7 @@ class ProseHandler(BaseHTTPRequestHandler):
             self.wfile.write(body)
 
     def _html(self, status: int, text: str) -> None:
+        text = mark_nav_current(text, urlparse(self.path).path)
         self._send(status, text.encode("utf-8"), "text/html; charset=utf-8")
 
     def _json(self, status: int, payload: dict | list) -> None:
@@ -1402,6 +1471,18 @@ class ProseHandler(BaseHTTPRequestHandler):
             elif path == "/practice":
                 self._html(200, render_practice_page(
                     PAGE_CSS, NAV, self.app.practice.models.status(), self.app.documents()))
+            elif path == "/controller":
+                self._html(
+                    200,
+                    render_controller_page(
+                        PAGE_CSS,
+                        NAV,
+                        self.app.practice.models.status(),
+                        [(d.doc_id, d.name) for d in self.app.documents()],
+                    ),
+                )
+            elif path == "/api/hud/menu":
+                self._json(200, self.app.launcher.snapshot())
             elif path == "/vocabulary":
                 self._html(200, render_vocabulary_page(PAGE_CSS, NAV))
             elif path == "/research":
@@ -1496,6 +1577,21 @@ class ProseHandler(BaseHTTPRequestHandler):
         except OSError:
             pass
 
+    def do_OPTIONS(self) -> None:
+        """Preflight for the phone relay's button forward and matrix pads."""
+        parsed = urlparse(self.path)
+        if parsed.path in ("/api/hud/button", "/api/hud/menu"):
+            self.send_response(204)
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "content-type")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        self.send_response(405)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
         try:
@@ -1512,6 +1608,9 @@ class ProseHandler(BaseHTTPRequestHandler):
             body = (
                 self.rfile.read(length).decode("utf-8", errors="replace") if length else ""
             )
+            if parsed.path.startswith("/api/hud/"):
+                self._hud_menu_post(parsed.path, body)
+                return
             if parsed.path.startswith("/api/copilot/"):
                 self._copilot_post(parsed.path, body)
                 return
@@ -1606,6 +1705,68 @@ class ProseHandler(BaseHTTPRequestHandler):
         except sqlite3.Error:
             self._json(503, {"error": "The word notebook could not be saved. Retry in a moment."})
 
+    def _hud_menu_post(self, path: str, body: str) -> None:
+        if self.headers.get_content_type() != "application/json":
+            self._json(415, {"error": "use application/json"})
+            return
+        data = json.loads(body)
+        if not isinstance(data, dict):
+            raise ValueError("JSON body must be an object")
+        action = data.get("action")
+        origin = self.headers.get("Origin")
+        # The glasses relay forwards accessory buttons from the phone WebView,
+        # whose Origin can never equal this server, and hosts the same
+        # personality pads: preference writes (tone/mode) cross the origin
+        # boundary, while navigation actions stay same-origin only.
+        relay_open = path == "/api/hud/button" or (
+            path == "/api/hud/menu" and action in ("tone", "mode"))
+        if (not relay_open and origin
+                and urlparse(origin).netloc != self.headers.get("Host")):
+            self._json(403, {"error": "cross-origin HUD requests are not allowed"})
+            return
+        launcher = self.app.launcher
+        apply_mode = None
+        if path == "/api/hud/button":
+            launcher.press(str(data.get("button", "")))
+        elif path != "/api/hud/menu":
+            self._json(404, {"error": "not found"})
+            return
+        elif action in (None, "state"):
+            pass
+        elif action == "move":
+            delta = data.get("delta", 1)
+            if type(delta) is not int:
+                raise ValueError("delta must be an integer")
+            launcher.move(delta)
+        elif action == "select":
+            launcher.select()
+        elif action == "back":
+            launcher.back()
+        elif action == "dial":
+            delta = data.get("delta", 1)
+            if type(delta) is not int:
+                raise ValueError("delta must be an integer")
+            launcher.dial_step(delta)
+        elif action == "mode":
+            mode = data.get("mode")
+            if not isinstance(mode, str):
+                raise ValueError("mode must be a text value")
+            launcher.set_mode(mode)
+            apply_mode = mode
+        elif action == "tone":
+            mode = data.get("mode") or launcher.tone_mode
+            tone = ToneMatrix.from_dict(mode, data.get("tone", {}))
+            launcher.set_tone(tone.as_payload(), mode)
+            apply_mode = mode
+        else:
+            raise ValueError("unknown HUD action")
+        if apply_mode is None and launcher.state == "tone":
+            apply_mode = launcher.tone_mode
+        if apply_mode is not None:
+            self.app.copilot.apply_tone(launcher.tones[apply_mode], apply_mode)
+        self.app.hub.publish(launcher.payload())
+        self._json(200, launcher.snapshot())
+
     def _practice_post(self, path: str, body: str) -> None:
         origin = self.headers.get("Origin")
         if origin and urlparse(origin).netloc != self.headers.get("Host"):
@@ -1619,7 +1780,17 @@ class ProseHandler(BaseHTTPRequestHandler):
             raise ValueError("JSON body must be an object")
         try:
             if path == "/api/practice/sessions":
-                self._json(201, self.app.practice.create(data, self.app.documents()))
+                state = self.app.practice.create(data, self.app.documents())
+                session_id = str(state.get("session_id") or "")
+                score = SessionScore()
+                with self.app._lock:
+                    if session_id:
+                        self.app.scores[session_id] = score
+                self.app.launcher.back()
+                self.app.hub.publish(practice_frame(
+                    state, score, "start",
+                    {"hit": False, "delta": 0, "momentum": score.momentum}))
+                self._json(201, state)
             elif path in ("/api/practice/turn", "/api/practice/state", "/api/practice/stop",
                           "/api/practice/model"):
                 session_id = data.get("session_id")
@@ -1627,6 +1798,10 @@ class ProseHandler(BaseHTTPRequestHandler):
                     raise ValueError("session_id is required")
                 if path.endswith("/stop"):
                     self.app.practice.stop(session_id)
+                    with self.app._lock:
+                        self.app.scores.pop(session_id, None)
+                    self.app.launcher.back()
+                    self.app.hub.publish(self.app.launcher.payload())
                     self._json(200, {"stopped": True})
                 else:
                     session = self.app.practice.get(session_id)
@@ -1636,9 +1811,19 @@ class ProseHandler(BaseHTTPRequestHandler):
                         model_id, settings = self.app.practice.models.resolve(data.get("model_id"))
                         state = session.change_model(
                             model_id, ModelCoach(settings, max_completion_tokens=4096),
-                            data.get("expected_turn"))
+                            data.get("expected_turn")
+                        )
                     elif path.endswith("/turn"):
                         state = session.reply(data.get("text"), data.get("expected_turn"))
+                        with self.app._lock:
+                            score = self.app.scores.setdefault(session_id, SessionScore())
+                        hud = score.turn(state)
+                        state["hud_score"] = {
+                            "momentum": score.momentum,
+                            "hit": score.hit,
+                            "delta": score.delta,
+                        }
+                        self.app.hub.publish(practice_frame(state, score, "turn", hud))
                     else:
                         state = session.snapshot()
                     self._json(200, state)
@@ -1668,19 +1853,32 @@ class ProseHandler(BaseHTTPRequestHandler):
         try:
             if path == "/api/copilot/sessions":
                 session_id, session = self.app.copilot.create(data, self.app.documents())
+                with suppress(ValueError):
+                    session.set_tone(self.app.launcher.tone_for(session.config.mode))
                 self._json(201, {"session_id": session_id, "mode": session.config.mode})
-            elif path in ("/api/copilot/turn", "/api/copilot/stop"):
+            elif path in ("/api/copilot/turn", "/api/copilot/stop", "/api/copilot/tone"):
                 session_id = data.get("session_id")
                 if not isinstance(session_id, str) or not session_id:
                     raise ValueError("session_id is required")
                 if path.endswith("/stop"):
                     self.app.copilot.stop(session_id)
                     self._json(200, {"stopped": True})
+                elif path.endswith("/tone"):
+                    session = self.app.copilot.get(session_id)
+                    nested = data.get("tone")
+                    flat = {key: value for key, value in data.items()
+                            if key != "session_id"}
+                    tone = session.set_tone(nested if isinstance(nested, dict) else flat)
+                    self.app.launcher.set_tone(tone.as_payload(), tone.mode)
+                    self._json(200, {"tone": tone.as_payload(), "mode": tone.mode})
                 else:
                     session = self.app.copilot.get(session_id)
                     frame = session.feed_transcript(TranscriptLine(
                         data.get("speaker", "Speaker"), data.get("text", "")
                     ))
+                    self.app.hub.publish(
+                        {**frame_to_payload(frame), **frame_to_glasses_payload(frame)}
+                    )
                     self._json(200, {"frame": frame_to_payload(frame)})
             else:
                 self._json(404, {"error": "not found"})
@@ -1810,16 +2008,22 @@ class ProseHandler(BaseHTTPRequestHandler):
         self.send_header("Connection", "close")
         self.end_headers()
         self.close_connection = True
-        hud = HudSimulator()
-        for line in SAMPLE_TRANSCRIPT:
-            frame = hud.feed(line)
-            payload = json.dumps(frame_to_payload(frame))
-            try:
-                self.wfile.write(f"event: frame\ndata: {payload}\n\n".encode())
+        subscriber = self.app.hub.subscribe()
+        try:
+            while True:
+                try:
+                    payload = subscriber.get(timeout=15)
+                except queue.Empty:
+                    self.wfile.write(b": heartbeat\n\n")
+                    self.wfile.flush()
+                    continue
+                data = json.dumps(payload)
+                self.wfile.write(f"event: frame\ndata: {data}\n\n".encode())
                 self.wfile.flush()
-            except OSError:
-                return
-            time.sleep(0.8)
+        except OSError:
+            return
+        finally:
+            self.app.hub.unsubscribe(subscriber)
 
 
 @dataclass
@@ -1862,6 +2066,7 @@ def serve(host: str = "127.0.0.1", port: int = 8000, block: bool = True) -> WebS
     print(f"[prose.web] dashboard    : {site.url}")
     print(f"[prose.web] live coach   : {site.url}/copilot (litigation + debate)")
     print(f"[prose.web] practice     : {site.url}/practice (AI opponent + private coach)")
+    print(f"[prose.web] controller   : {site.url}/controller (phone gamepad + HUD launcher)")
     print(f"[prose.web] vocabulary   : {site.url}/vocabulary (saved word notebook + recall)")
     print(f"[prose.web] discovery    : {site.url}/documents (recall + graph)")
     print(f"[prose.web] collections  : {site.url}/live")

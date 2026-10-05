@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 import json
+import re
 import threading
 import urllib.error
 import urllib.parse
@@ -373,3 +374,30 @@ def test_join_rejects_missing_payload() -> None:
         with pytest.raises(urllib.error.HTTPError) as exc:
             urllib.request.urlopen(req)
         assert exc.value.code == 400
+
+
+def test_page_shell_consistency() -> None:
+    """Every page shares the shell: lang, viewport, branded title, nav state,
+    and the not-legal-advice disclaimer."""
+    pages = ("/", "/copilot", "/practice", "/documents", "/live",
+             "/exports", "/vocabulary", "/research", "/suits", "/controller")
+    with _site() as site:
+        for path in pages:
+            # "/" cold-starts the pipeline on a fresh site, so allow for it.
+            # 30s: cold start varies with machine load (AV scans, etc.).
+            with urllib.request.urlopen(site.url + path, timeout=30) as resp:
+                page = resp.read().decode("utf-8")
+            assert 'lang="en"' in page, path
+            assert 'name="viewport"' in page, path
+            title = re.search(r"<title>(.*?)</title>", page)
+            assert title and title.group(1).endswith(" · LexGlasses"), path
+            assert "legal advice" in page.lower(), path
+            assert "<nav" in page, path
+            assert 'class="skip" href="#main"' in page, path
+            assert '<main id="main"' in page, path
+            assert f'<a href="{path}" aria-current="page"' in page, path
+            # Heading hierarchy starts at h1 and never skips a level.
+            levels = [int(m) for m in re.findall(r"<h([123])[^>]*>", page)]
+            assert levels and levels[0] == 1, path
+            assert all(b <= a + 1
+                       for a, b in zip(levels, levels[1:], strict=False)), path

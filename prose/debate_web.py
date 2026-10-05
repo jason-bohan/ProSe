@@ -9,27 +9,33 @@ from .debate import PERSONAS, TEMPERAMENTS
 PRACTICE_CSS = """
 .practice-intro{max-width:720px;margin-bottom:1.4rem;color:var(--g9)}
 .practice-grid{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(280px,1fr);gap:1.25rem;align-items:start}
-.practice-grid .card{margin-top:0}.practice-grid h2{font-weight:400;font-size:1.15rem;margin:0 0 .8rem}
+.practice-grid .card{margin-top:0}.practice-grid h2{font-weight:700;font-size:1.15rem;margin:0 0 .8rem}
 .practice-grid fieldset{border:0;padding:0;margin:0;min-width:0}
 .practice-grid label{font-weight:400;text-transform:none}.practice-grid textarea{min-height:80px;font-family:inherit}
 .practice-grid input[type=text]{font-family:inherit}.practice-grid .pair{display:grid;grid-template-columns:1fr 1fr;gap:.8rem}
 .practice-grid .row{margin-bottom:.8rem}.practice-grid .btn-row{flex-wrap:wrap}
 .practice-grid [hidden]{display:none!important}.practice-grid button:disabled{opacity:.4;cursor:default}
-.practice-grid :focus-visible{outline:2px solid var(--b);outline-offset:3px}
-.practice-grid .eyebrow{font:11px ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase}
-.practice-grid .coach-card{background:#eff7f4;border-color:#b4cec4;position:sticky;top:1rem}
+.practice-grid :focus-visible{outline:2px solid var(--o);outline-offset:3px}
+.practice-grid .eyebrow{font:700 11px ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase}
+.practice-grid .coach-card{background:var(--k);border-color:var(--k);color:var(--tw);position:sticky;top:1rem}
 .coach-card blockquote{margin:1rem 0;font-size:1.3rem;font-weight:400;line-height:1.5;white-space:pre-wrap}
-.coach-card h3{text-transform:none;font-weight:400;margin-top:1.1rem}.coach-card p{white-space:pre-wrap}
-.practice-grid .coach-foot{font-size:.8rem;color:var(--g9);border-top:1px solid #cbded6;padding-top:1rem}
+.coach-card h3{text-transform:none;font-weight:700;margin-top:1.1rem;color:var(--tw)}.coach-card p{white-space:pre-wrap}
+.coach-card .eyebrow{color:var(--o)}
+.coach-card .small{color:#9a9a9a}.coach-card a{color:var(--tw)}
+.coach-card button{background:var(--o);color:var(--w)}
+.coach-card button:hover{background:#ff6a30;opacity:1}
+.coach-card button:active{background:var(--tw);color:var(--k)}
+.practice-grid .coach-foot{font-size:.8rem;color:#9a9a9a;border-top:1px solid #2a2a30;padding-top:1rem}
 #practice-status{min-height:1.5rem;margin:.7rem 0;font-size:.9rem}#practice-status.error{color:#a21b22}
 .practice-grid .conversation{max-height:520px;overflow-y:auto;overscroll-behavior:contain;padding-right:.3rem}
-.practice-grid .bubble{padding:1rem;margin:.75rem 0;border:1px solid var(--g1);border-radius:8px;background:#f5f5f5}
-.practice-grid .bubble.opponent{background:#edf4fc;border-color:#c3d6eb;margin-right:1.2rem}
-.practice-grid .bubble.you{margin-left:1.2rem}.practice-grid .bubble p{margin:.4rem 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
-.practice-grid .bubble strong{font-size:.78rem;font-weight:500;text-transform:uppercase;letter-spacing:.05em}
+.practice-grid .bubble{padding:1rem;margin:.75rem 0;border:1px solid var(--face2);border-radius:0;background:var(--w)}
+.practice-grid .bubble.opponent{background:var(--face);border-color:var(--g3);margin-right:1.2rem}
+.practice-grid .bubble.you{border-color:var(--k);margin-left:1.2rem}.practice-grid .bubble p{margin:.4rem 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.practice-grid .bubble strong{font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
 .practice-grid .small{font-size:.83rem;color:var(--g9)}.practice-grid .voice-toggle{display:flex;gap:.5rem;align-items:center;font-size:.85rem}
-.practice-grid .topic-button{background:white;color:var(--k);font-size:.78rem;border:1px solid var(--g3);padding:.4rem .65rem}
-.practice-grid summary{font-weight:400}.practice-grid .empty{padding:2rem .5rem;text-align:center;color:var(--g9)}
+.practice-grid .topic-button{background:var(--w);color:var(--k);font-size:.78rem;border:1px solid var(--g3);padding:.4rem .65rem}
+.practice-grid .topic-button:hover{background:var(--face)}
+.practice-grid summary{font-weight:700}.practice-grid .empty{padding:2rem .5rem;text-align:center;color:var(--grey)}
 @media(max-width:780px){.practice-grid{grid-template-columns:1fr}.practice-grid .coach-card{position:static;grid-row:1}.practice-grid .pair{grid-template-columns:1fr}.container{padding:1rem}.practice-grid .conversation{max-height:400px}}
 """
 
@@ -347,7 +353,7 @@ def render_practice_page(css: str, nav: str, status: dict, documents: list | Non
     ) or '<p class="small">Import documents in Discovery to include excerpts.</p>'
     body = """
 <p class="practice-intro">Build your argument before the real conversation. An AI opponent pushes back, while your private coach helps you find the words. Practice here on your phone or computer.</p>
-<main class="practice-grid"><div>
+<main id="main" class="practice-grid"><div>
 <section class="card"><div class="row"><label for="practice-model">AI model</label><select id="practice-model" aria-describedby="model-help">__MODELS__</select><p id="model-help" class="small"></p><p class="small">Switch between turns to keep your conversation and draft. The selected model handles both opponent and coach.</p><p class="small">__MODEL_WARNING__</p></div>
 <details id="practice-setup" open><summary id="practice-summary">Set up your debate</summary>
 <form id="practice-form"><fieldset id="practice-settings">
@@ -401,4 +407,7 @@ def render_practice_page(css: str, nav: str, status: dict, documents: list | Non
             f'<title>Debate practice · LexGlasses</title><style>{css}{PRACTICE_CSS}</style>'
             f'</head><body><div class="container"><header class="header"><div>'
             f'<h1>Debate practice</h1><div class="badge">An opponent. A coach. Your voice.</div>'
-            f'</div>{nav}</header>{body}</div><script>{PRACTICE_JS}</script></body></html>')
+            f'</div>{nav}</header>{body}'
+            f'<footer>DISCLAIMER: practice transcripts and suggestions are '
+            f'simulation only. Not legal advice; not for filing.</footer>'
+            f'</div><script>{PRACTICE_JS}</script></body></html>')

@@ -115,7 +115,7 @@ RESEARCH_JS = r"""
 
 def render_research_page(css: str, nav: str) -> str:
     return f'''<!doctype html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>Research · ProSe</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Research · LexGlasses</title>
 <style>{css}
 .source-row {{padding:1rem 0;border-bottom:1px solid #bbb5}} .source-row button {{text-align:left;max-width:100%}}
 .source-text {{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6}} #inventory {{max-height:65vh;overflow:auto}}
@@ -125,7 +125,7 @@ select,input {{max-width:100%}} .research-actions {{display:flex;gap:.6rem;flex-
 .import-summary ul {{margin:.5rem 0 .2rem;padding-left:1.5rem}} .import-summary li {{margin:.3rem 0;overflow-wrap:anywhere}}
 </style></head><body><div class="container"><header class="header"><div><h1>Research library</h1>
 <div class="badge">Saved sources · searchable offline</div></div>{nav}</header>
-<main><section class="card"><h2>Scouting America</h2><p id="coverage" role="status">Loading coverage…</p><p id="scope" class="small"></p>
+<main id="main"><section class="card"><h2>Scouting America</h2><p id="coverage" role="status">Loading coverage…</p><p id="scope" class="small"></p>
 <p>Read the national guides here, then <a href="/practice?topic=scouting">practice a Scout-removal discussion</a>. The coach retrieves passages each turn. Legal references are separately labeled and optional in practice.</p>
 <details><summary>Import your situation documents</summary><p>Download the Google Drive folder as a ZIP and put it in <code>.prose/scouting-case</code>. PDF, Word, PowerPoint, Excel, text, CSV, JSON and email files are supported. Photos and scans need OCR before they can be searched.</p><button id="import-case">Import case folder</button><div id="import-status" role="status" aria-live="polite"></div><p class="small">Import saves and indexes locally. Enable “Include my imported case documents” in a debate to send relevant excerpts to your selected model.</p></details>
 <label for="category">Category</label><select id="category"><option value="">All categories</option></select>
@@ -134,4 +134,4 @@ select,input {{max-width:100%}} .research-actions {{display:flex;gap:.6rem;flex-
 <p class="small">Search finds passages containing any of your terms. PDFs use file page numbers; printed page numbers can differ. Text extraction may omit images or scanned pages.</p>
 <p id="result-count" role="status"></p><div id="results"></div><div class="research-actions"><button id="previous" disabled>Previous</button><button id="next" disabled>Next</button></div></section>
 <section class="card" id="document" hidden><button id="close-document">Close document</button><h2 id="document-title"></h2><p id="document-meta" class="small"></p><div id="document-text"></div></section>
-<section class="card"><h2>Document inventory</h2><p>Includes unavailable sources and older documents still linked by the publisher. A saved copy is a snapshot, not a promise that every rule is current or applies to your unit.</p><label for="inventory-filter">Filter document titles</label><input id="inventory-filter" placeholder="charter, renewal, safety…"><p id="inventory-count"></p><div id="inventory"></div></section></main></div><script>{RESEARCH_JS}</script></body></html>'''
+<section class="card"><h2>Document inventory</h2><p>Includes unavailable sources and older documents still linked by the publisher. A saved copy is a snapshot, not a promise that every rule is current or applies to your unit.</p><label for="inventory-filter">Filter document titles</label><input id="inventory-filter" placeholder="charter, renewal, safety…"><p id="inventory-count"></p><div id="inventory"></div></section></main><footer>DISCLAIMER: research summaries are leads to verify, not conclusions. Not legal advice.</footer></div><script>{RESEARCH_JS}</script></body></html>'''

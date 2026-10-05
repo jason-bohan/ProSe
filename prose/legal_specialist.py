@@ -11,6 +11,7 @@ from .copilot import (
     ModelCoach,
     SessionConfig,
     SourceNote,
+    ToneMatrix,
     _text,
     parse_cue,
 )
@@ -184,9 +185,10 @@ class ConsultingCoach:
         return finish(final)
 
     def respond(self, config: SessionConfig, turns: list[dict],
-                sources: tuple[SourceNote, ...]) -> dict:
+                sources: tuple[SourceNote, ...], tone: ToneMatrix) -> dict:
         # Preserve the HUD's 15-second stale-cue cutoff; never wait through a long review.
         return self.complete_json(SYSTEM_PROMPT, {
             "session": asdict(config), "recent_turns": turns,
-            "sources": [asdict(s) for s in sources],
+            "sources": [asdict(s) for s in sources], "tone": tone.as_payload(),
+            "tone_poles": tone.poles,
         }, budget=13)

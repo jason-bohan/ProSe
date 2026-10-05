@@ -84,6 +84,19 @@ claims are not automatically fact-checked. Sessions retain up to 20 rounds in
 memory and expire after 30 idle minutes or a server restart. Download the
 conversation before ending if you want to keep it.
 
+## Phone controller and HUD launcher
+
+Open `/controller` on your phone to drive the whole loop. The page opens a
+gamepad menu that moves the **HUD launcher** running on the glasses (`/hud/stream`):
+pick Debate practice or Litigation practice, configure the session — topic,
+position, opponent, and up to six case files from your library — then fight it
+round by round. The view shows an animated confidence meter (it flashes when a
+rebuttal lands and the opponent's face reacts on the glasses), slide-in
+transcript bubbles, and the coach's suggested reply you can send or edit.
+Paste the glasses stream link shown on the page into the MemoMind relay once;
+menu, confidence, mood, and cues then follow live. Same disclaimer: preparation
+aid only, not legal advice.
+
 ## Live litigation and debate coach
 
 Open `/copilot` after `prose serve` to start a **Debate coach** or **Litigation

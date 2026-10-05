@@ -7,11 +7,11 @@
   "version": "0.1.0",
   "entry": "index.html",
   "permissions": [
-    {"name": "display", "required": true},
-    {"name": "network", "required": true}
+    {"name": "network", "required": true},
+    {"name": "device.messaging", "required": true, "scope": {"channels": [20560]}}
   ],
   "deviceRequirements": {
-    "preferredPluginId": "com.gm.example.web-bridge",
-    "protocols": [{"id": "gm.scene", "minVersion": "1.0"}]
+    "preferredPluginId": "com.prose.glasses-hud",
+    "protocols": [{"id": "prose.coach-hud", "minVersion": "1.0"}]
   }
 }
