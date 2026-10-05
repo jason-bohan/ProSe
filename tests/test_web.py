@@ -3,6 +3,8 @@ from __future__ import annotations
 import html
 import json
 import re
+import shutil
+import subprocess
 import threading
 import urllib.error
 import urllib.parse
@@ -12,6 +14,8 @@ from datetime import date
 
 import pytest
 
+import prose.controller_web as controller_web
+import prose.debate_web as debate_web
 import prose.web as web
 from prose import NOT_LEGAL_ADVICE
 from prose.crawler import Violation
@@ -401,3 +405,63 @@ def test_page_shell_consistency() -> None:
             assert levels and levels[0] == 1, path
             assert all(b <= a + 1
                        for a, b in zip(levels, levels[1:], strict=False)), path
+
+
+def test_voice_controls_are_wired() -> None:
+    """Voice selects exist in the DOM, refresh when the browser finishes
+    loading voices, and the chosen voice reaches every speech call."""
+    pages = {}
+    with _site() as site:
+        for path in ("/practice", "/controller"):
+            with urllib.request.urlopen(site.url + path, timeout=30) as resp:
+                pages[path] = resp.read().decode("utf-8")
+    practice, controller = pages["/practice"], pages["/controller"]
+    assert 'id="practice-voice"' in practice
+    assert 'id="hud-voice"' in controller
+    # Every element the scripts reach for must exist in the served page,
+    # or the handler that touches it dies with a TypeError.
+    for page, script in ((practice, debate_web.PRACTICE_JS),
+                         (controller, controller_web.CONTROLLER_JS)):
+        wanted = set(re.findall(r"\$\('([^']+)'\)", script))
+        present = set(re.findall(r'id="([^"]+)"', page))
+        assert wanted <= present, sorted(wanted - present)
+    for script in (debate_web.PRACTICE_JS, controller_web.CONTROLLER_JS):
+        assert "voiceschanged', refreshVoices" in script
+    assert "utterance.voice = voice" in debate_web.PRACTICE_JS
+    assert "utter.voice = voice" in controller_web.CONTROLLER_JS
+    assert "'hear-coach').addEventListener('click'" in debate_web.PRACTICE_JS
+    # Dictation follows the picked voice's language; SpeechRecognition
+    # has no .voice property, so the language tag is the real channel.
+    assert "rec.voice" not in controller_web.CONTROLLER_JS
+    assert "voice.lang : 'en-US'" in controller_web.CONTROLLER_JS
+    assert "voice.lang : 'en-US'" in debate_web.PRACTICE_JS
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node not on PATH")
+def test_page_scripts_parse(tmp_path) -> None:
+    """Every inline <script> on every page must parse. One SyntaxError kills
+    the whole script, silently turning an interactive page into static HTML."""
+    pages = ("/", "/copilot", "/practice", "/documents", "/live",
+             "/exports", "/vocabulary", "/research", "/suits", "/controller")
+    checked = 0
+    with_scripts = set()
+    with _site() as site:
+        for path in pages:
+            with urllib.request.urlopen(site.url + path, timeout=30) as resp:
+                body = resp.read().decode("utf-8")
+            sources = re.findall(r"<script>(.*?)</script>", body, re.S)
+            if sources:
+                with_scripts.add(path)
+            for index, source in enumerate(sources):
+                target = (tmp_path
+                          / f"{path.strip('/').replace('/', '_') or 'home'}-{index}.js")
+                target.write_text(source, encoding="utf-8")
+                result = subprocess.run(["node", "--check", str(target)],
+                                        capture_output=True, text=True)
+                assert result.returncode == 0, (
+                    f"{path} script #{index}: {result.stdout}{result.stderr}")
+                checked += 1
+    # /live, /exports and /suits are server-rendered with no inline script;
+    # the two voice pages must have been found and parsed.
+    assert checked >= 9, checked
+    assert {"/practice", "/controller"} <= with_scripts, with_scripts
