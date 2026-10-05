@@ -126,8 +126,15 @@ PRACTICE_JS = r"""
     const response = await fetch('/api/practice/' + action, {
       method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
     });
-    const data = await response.json();
-    if (!response.ok) { const e = new Error(data.error || 'Request failed.'); e.status = response.status; throw e; }
+    let data;
+    try { data = await response.json(); }
+    catch (_) { data = null; }
+    if (!response.ok) {
+      const error = new Error(data && data.error || 'Practice request failed (HTTP ' + response.status + ').');
+      error.status = response.status;
+      throw error;
+    }
+    if (!data || typeof data !== 'object') throw new Error('Practice server returned an invalid response.');
     return data;
   }
   function controls() {

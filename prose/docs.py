@@ -27,15 +27,19 @@ class Draft:
     text: str
 
     def save(self, directory: Path) -> Path:
-        directory.mkdir(parents=True, exist_ok=True)
-        path = directory / f"{self.document_id}.txt"
+        root = directory.resolve()
+        root.mkdir(parents=True, exist_ok=True)
+        path = (root / f"{self.document_id}.txt").resolve()
+        if path.parent != root:
+            raise DraftValidationError("document id must stay inside the output directory")
         path.write_text(self.text, encoding="utf-8")
         return path
 
 
 def render(doc_type: str, tokens: dict[str, str]) -> str:
-    path = TEMPLATE_DIR / f"{doc_type}.txt"
-    if not path.exists():
+    template_root = TEMPLATE_DIR.resolve()
+    path = (TEMPLATE_DIR / f"{doc_type}.txt").resolve()
+    if not path.is_relative_to(template_root) or not path.is_file():
         raise KeyError(f"no template for doc type: {doc_type}")
     text = path.read_text(encoding="utf-8")
     for key, value in tokens.items():

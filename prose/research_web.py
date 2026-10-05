@@ -7,7 +7,10 @@ RESEARCH_JS = r"""
   function node(tag, text, cls) { const n = document.createElement(tag); n.textContent = text; if (cls) n.className = cls; return n; }
   async function api(path, body = {}) {
     const r = await fetch('/api/research/' + path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-    const data = await r.json(); if (!r.ok) throw new Error(data.error || 'Research request failed.'); return data;
+    let data; try { data = await r.json(); } catch (_) { data = null; }
+    if (!r.ok) throw new Error(data && data.error || 'Research request failed (HTTP ' + r.status + ').');
+    if (!data || typeof data !== 'object') throw new Error('Research server returned an invalid response.');
+    return data;
   }
   function external(url, title) { if (!/^https?:\/\//.test(url)) return node('span', 'Original file is saved in your local case folder.'); const a = node('a', title); a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer'; return a; }
   function note(s) {

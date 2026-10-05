@@ -30,8 +30,10 @@ VOCAB_JS = r"""
   const notice = (message, error=false) => { $('vocab-notice').textContent = message; $('vocab-notice').classList.toggle('error',error); };
   async function api(action, body={}) {
     const response = await fetch('/api/vocabulary/' + action, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Request failed.');
+    let data; try { data = await response.json(); } catch (_) { data = null; }
+    if (!response.ok) throw new Error(data && data.error ||
+      'Vocabulary request failed (HTTP ' + response.status + ').');
+    if (!data || typeof data !== 'object') throw new Error('Vocabulary server returned an invalid response.');
     return data;
   }
   function lock(value) {
