@@ -45,6 +45,14 @@ framework, no build step, instant cold start. Pages:
 - `/exports` — productions page: download/open the case file, review set,
   graph, joinders, collected records, and recall as JSON; the case file
   opens as a readable viewer (`/exports/case-file`, `/api/simulate`)
+- `/controller` — phone gamepad for the glasses: pick Debate or Litigation
+  practice on the HUD launcher (`POST /api/hud/menu`), configure the session
+  (topic, opponent, up to six case files), then drive the debate with send /
+  suggestion / voice actions, an animated confidence meter, and coach
+  rebuttals; paste the glasses stream link (`/hud/stream`) into the MemoMind
+  relay once — menu, confidence, and cues follow automatically, and the
+  relay itself adds a **controller** row (opens this page) plus an embedded
+  **matrix** with the mode switch and both bipolar pads
 
 Machines: `/api/simulate`, `/recall`, `/graph.json`, `/live.json`,
 `/suits.json`, `/documents.json`, `/joins.json`. SSE: `/hud/stream`
@@ -58,9 +66,11 @@ Performance tricks:
 - **Live ingest is cached** per `(source, query, limit)` with a 30-second TTL,
   so repeated page loads or API polls never hammer the public CFPB/RECAP/FTC
   endpoints (which rate-limit unauthenticated clients).
-- **HUD stream is SSE** (`/hud/stream`) — one `EventSource` connection pushes
-  scripted `HudFrame` objects from the `HudSimulator` with a small delay.
-  Browser auto-reconnects on close; the feed loops indefinitely. No WebSocket
+- **HUD stream is SSE** (`/hud/stream`) — every connection subscribes to the
+  live frame hub and immediately replays the current frame (the launcher menu
+  when idle, the latest coach/practice cue during a session). Publishes come
+  from HUD menu moves, practice turns (confidence + opponent mood scoring),
+  and live-coach turns. Browser auto-reconnects on close. No WebSocket
   handshake, no `websockets` package required.
 - **Thread-per-request** via `ThreadingHTTPServer` (Python's built-in) is
   sufficient for the local-dev load profile; keep-alive is on (`HTTP/1.1`),
@@ -361,20 +371,35 @@ prose glasses --jsonl live_hud.jsonl
 
 The glasses/phone bridge receives the existing `seq`, `speaker`, `transcript`,
 `prompt`, and `objections` fields, plus `status`, `turn_id`, `latency_ms`,
-`expires_at` (Unix seconds), `error`, and a structured `cue`. Render `prompt` as
-the short cue; retain `cue.rationale`, `cue.next_question`, `cue.caveat`, and
-`cue.sources` for the companion. Replace the previous cue for every frame,
-including a null prompt, and clear at `expires_at`. Statuses include `thinking`,
-`ready`, `unavailable`, `expired`, and `listening`. Suggestions are advisory;
-source IDs are checked against supplied material, but interpretations are not
-independently verified. Model-reported confidence is not treated as a probability.
+`expires_at` (Unix seconds), `error`, `momentum_pct` (0-100, 50 = even), and a
+structured `cue` (now also carrying `mood_label`, `mood_intensity` 1-5, and
+`momentum_signal`). Render `prompt` as the short cue; retain `cue.rationale`,
+`cue.next_question`, `cue.caveat`, and `cue.sources` for the companion. Only a
+`status: "ready"` frame should replace what's displayed -- including a null
+prompt, which means "explicitly nothing to add" and clears the display. Every
+other status (`thinking`, `unavailable`, `expired`, `listening`) is a no-op for
+display purposes; a receiver should keep showing its last `ready` frame rather
+than clearing on a timer. Suggestions are advisory; source IDs are checked
+against supplied material, but interpretations are not independently verified.
+Model-reported confidence is not treated as a probability. The mood and
+momentum fields are playful, subjective engagement signals derived from the
+model's read of the transcript -- not a prediction of legal merit or debate
+outcome, and should not be treated as case-strength guidance.
 
 For a phone-to-glasses link, use `--compact-hud` on `prose listen` or request
-`/api/copilot/events?session_id=…&view=glasses`. The compact version-1 frame has
-only `seq`, `turn_id`, `status`, `prompt` (at most 140 characters), and
+`/api/copilot/events?session_id=…&view=glasses`. The compact version-2 frame has
+`seq`, `turn_id`, `status`, `speaker` (at most 40 characters), `prompt` (at most
+140 characters), `mood_label`, `mood_intensity`, `momentum_pct`, and
 `expires_at`. It omits transcripts, documents, and the longer explanation. The
 phone retains the full companion frame and forwards the compact cue through
-the glasses vendor's display SDK. A null prompt always clears the display.
+the glasses vendor's display SDK. A `ready` frame with a null prompt clears the
+display; any other status leaves the current display untouched.
+
+A session's coaching tone (directness, formality, encouragement, humor, each
+0-4) can be adjusted live via `POST /api/copilot/tone` (also exposed as sliders
+on the `/copilot` page) without restarting the session. A change takes effect
+starting with the next transcript turn; it only affects delivery style, never
+the underlying factual, citation, or evidentiary rules.
 
 MemoMind One has a concrete [PhoneSDK display relay](integrations/memomind/README.md)
 in this repository. The `/copilot` page exposes its private stream link after

@@ -38,7 +38,7 @@ def frame_to_payload(frame: HudFrame) -> dict:
     if frame.status is not None:
         payload.update(status=frame.status, turn_id=frame.turn_id,
                        latency_ms=frame.latency_ms, error=frame.error,
-                       expires_at=frame.expires_at,
+                       expires_at=frame.expires_at, momentum_pct=frame.momentum_pct,
                        cue=asdict(frame.cue) if frame.cue else None)
         if frame.legal_review is not None:
             payload["legal_review"] = frame.legal_review
@@ -48,12 +48,20 @@ def frame_to_payload(frame: HudFrame) -> dict:
 def frame_to_glasses_payload(frame: HudFrame) -> dict:
     """Small display update for a phone-to-glasses bridge; no case documents.
 
-    A null prompt means clear the display. The receiver must also clear at the
-    Unix timestamp expires_at, even when its connection stops receiving data.
+    Version 2: only a status:"ready" frame should change what's on the lens (a
+    null prompt on a ready frame means clear the display); any other status is
+    a no-op for the receiver, which keeps showing its last ready frame until
+    the next one arrives or the session ends.
     """
+    cue = frame.cue
     return {
-        "version": 1, "seq": frame.seq, "turn_id": frame.turn_id,
-        "status": frame.status or "ready", "prompt": (frame.prompt or "")[:140] or None,
+        "version": 2, "seq": frame.seq, "turn_id": frame.turn_id,
+        "status": frame.status or "ready",
+        "speaker": (frame.transcript.speaker[:40] or None) if frame.transcript else None,
+        "prompt": (frame.prompt or "")[:140] or None,
+        "mood_label": cue.mood_label if cue else "",
+        "mood_intensity": cue.mood_intensity if cue else 0,
+        "momentum_pct": frame.momentum_pct,
         "expires_at": frame.expires_at,
     }
 

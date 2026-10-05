@@ -2,37 +2,289 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ProSe · MemoMind One</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#e4e4e4">
+  <title>prose · hud link</title>
   <style>
-    body{font:16px system-ui,sans-serif;background:#0b161b;color:#d5f3e6;margin:0;padding:24px}
-    main{max-width:540px;margin:auto}h1{font-size:26px;font-weight:500}
-    label{display:block;margin:20px 0 8px}input{box-sizing:border-box;width:100%;padding:12px;
-    background:#152b32;border:1px solid #7da497;color:inherit;border-radius:6px}
-    button{padding:12px 20px;margin:14px 8px 0 0;border:0;border-radius:6px;cursor:pointer}
-    button:disabled{opacity:.5}#preview{min-height:120px;font-size:24px;line-height:1.4;
-    border:1px solid #7da497;border-radius:12px;padding:20px;margin:24px 0}
-    .help{font-size:14px;color:#aac8bc}#status{min-height:48px}
+    :root {
+      --bg: #e4e4e4;
+      --paper: #f5f5f5;
+      --press: #eaeaea;
+      --hair: #c7c7c7;
+      --ink: #0f0e12;
+      --dim: #7f7f7f;
+      --orange: #e05526;
+      --screen: #000005;
+      --phos: #3df07c;
+      --phos-dim: #1f8a4a;
+      --sans: Univers, UniversTE20T, "Helvetica Neue", Helvetica, Arial, sans-serif;
+      --mono: ui-monospace, Menlo, Consolas, monospace;
+    }
+    html { font-size: 12px; }
+    * { box-sizing: border-box; padding: 0; margin: 0; }
+    html, body, button, input, summary {
+      -webkit-user-select: none; user-select: none;
+      -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      width: 100vw; height: 100dvh; overflow: hidden;
+      background: var(--bg); color: var(--ink);
+      font: 400 1.25rem/1.4 var(--sans);
+      -webkit-font-smoothing: antialiased;
+      letter-spacing: .05rem;
+    }
+    .shell {
+      height: 100dvh; max-width: 480px; margin: 0 auto;
+      padding: max(10px, env(safe-area-inset-top)) 16px
+        max(10px, env(safe-area-inset-bottom));
+      display: grid; grid-template-rows: auto 1fr auto auto; gap: 12px;
+    }
+    .head { display: flex; align-items: baseline; justify-content: space-between; }
+    .mark { font-size: 1.5rem; font-weight: 700; text-transform: lowercase; }
+    .mark i {
+      display: inline-block; width: .6rem; height: .6rem;
+      background: var(--orange); margin: 0 .5rem;
+      vertical-align: baseline;
+    }
+    .mark span { font-weight: 400; }
+    .plate {
+      font-size: 1rem; color: var(--dim); text-transform: lowercase;
+      letter-spacing: .08rem;
+    }
+    .screen {
+      position: relative; min-height: 0; background: var(--screen);
+      border-radius: 10px; overflow: hidden;
+      display: grid; grid-template-rows: 1fr auto;
+      box-shadow: inset 0 0 0 1px #000000, 0 1px 0 #ffffff80;
+    }
+    .screen::after {
+      content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+      background: repeating-linear-gradient(0deg, #00000030 0 1px, transparent 1px 3px);
+    }
+    #preview {
+      position: relative; z-index: 1; min-height: 0; overflow: hidden;
+      padding: 14px 16px;
+      font-family: var(--mono); font-size: 1.35rem; line-height: 1.5;
+      color: var(--phos); text-shadow: 0 0 6px #3df07c55;
+      white-space: pre-wrap; overflow-wrap: anywhere;
+      text-transform: none;
+    }
+    .statusbar {
+      position: relative; z-index: 3;
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 16px; border-top: 1px solid #123;
+    }
+    .led {
+      flex: none; width: 7px; height: 7px; border-radius: 50%;
+      background: var(--hair); transition: background .15s ease;
+    }
+    body[data-conn="wait"] .led { background: var(--orange); animation: blink 1s infinite; }
+    body[data-conn="live"] .led,
+    body[data-conn="sample"] .led { background: var(--orange); }
+    body[data-conn="lost"] .led {
+      background: repeating-linear-gradient(-55deg, #f5f5f5 0 2px, var(--orange) 2px 4px);
+      animation: blink .5s steps(2, jump-none) infinite;
+    }
+    #status {
+      font-family: var(--mono); font-size: 1.05rem; color: var(--phos-dim);
+      text-transform: lowercase; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap;
+    }
+    .rows { border-top: 1px solid var(--hair); }
+    .row {
+      width: 100%; min-height: 44px;
+      display: grid; grid-template-columns: 3rem 1fr auto;
+      align-items: center; gap: 8px; padding: 6px 4px;
+      background: var(--paper); border: none;
+      border-bottom: 1px solid var(--hair);
+      font: 400 1.25rem/1.3 var(--sans); letter-spacing: .05rem;
+      color: var(--ink); text-align: left; text-transform: lowercase;
+      text-decoration: none; cursor: pointer; transition: background .08s ease;
+    }
+    .row:active:not(:disabled) { background: var(--press); }
+    .row:disabled { color: var(--dim); cursor: default; }
+    .row:focus-visible { outline: 2px solid var(--orange); outline-offset: -2px; }
+    .num {
+      font-variant-numeric: tabular-nums; font-size: 1rem; color: var(--dim);
+    }
+    .lbl { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .row-lbl, .hint {
+      font-size: 1rem; color: var(--dim); letter-spacing: .08rem;
+      display: inline-flex; align-items: center; gap: 7px;
+      transition: transform .08s ease;
+    }
+    .row:active:not(:disabled) .hint { transform: translateX(2px); }
+    .dot {
+      width: .7rem; height: .7rem; border-radius: 50%;
+      box-shadow: inset 0 0 0 1.5px var(--hair); background: transparent;
+      transition: background .15s ease, box-shadow .15s ease;
+    }
+    body[data-conn="wait"] .dot,
+    body[data-conn="live"] .dot,
+    body[data-conn="sample"] .dot {
+      background: var(--orange); box-shadow: inset 0 0 0 1.5px var(--orange);
+    }
+    body[data-conn="lost"] .dot {
+      background: repeating-linear-gradient(-55deg, var(--paper) 0 2px, var(--orange) 2px 4px);
+      box-shadow: inset 0 0 0 1.5px var(--orange);
+      animation: blink .5s steps(2, jump-none) infinite;
+    }
+    @keyframes blink { 50% { opacity: .25; } }
+    #connect .row-lbl { color: var(--ink); font-weight: 700; }
+    .cfg { display: block; }
+    .cfg summary {
+      list-style: none; cursor: pointer;
+      border-bottom: 1px solid transparent;
+    }
+    .cfg summary::-webkit-details-marker,
+    .cfg summary::marker { display: none; content: ""; }
+    .cfg[open] summary { border-bottom-color: var(--hair); }
+    .cfg[open] summary .hint { transform: rotate(90deg); color: var(--orange); }
+    .cfg summary:active { background: var(--press); }
+    .cfg-body {
+      padding: 10px 4px 12px 3.4rem; background: var(--paper);
+      border-bottom: 1px solid var(--hair);
+      display: grid; gap: 8px;
+    }
+    #session-url {
+      width: 100%; padding: 10px 12px;
+      background: #fff; border: 1px solid var(--hair); border-radius: 4px;
+      font: 400 1.1rem/1.3 var(--mono); color: var(--ink);
+      -webkit-user-select: text; user-select: text;
+    }
+    #session-url:focus {
+      outline: none; border-color: var(--orange); caret-color: var(--orange);
+    }
+    .cfg-note {
+      font-size: 1rem; line-height: 1.5; color: var(--dim);
+      text-transform: lowercase;
+    }
+    .fine {
+      font-size: 1rem; color: var(--dim); text-transform: lowercase;
+      letter-spacing: .04rem;
+    }
+    #controller[aria-disabled="true"] { color: var(--dim); }
+    .pads-cfg { padding: 10px 4px 12px; display: grid; gap: 8px; }
+    .seg {
+      display: grid; grid-template-columns: 1fr 1fr;
+      border: 1px solid var(--hair); border-radius: 4px; overflow: hidden;
+    }
+    .seg-btn {
+      min-height: 38px; background: var(--paper); border: none;
+      font: 400 1.1rem/1.2 var(--sans); letter-spacing: .06rem;
+      color: var(--dim); text-transform: lowercase; cursor: pointer;
+    }
+    .seg-btn.on { background: var(--ink); color: var(--paper); font-weight: 700; }
+    .seg-btn:active { background: var(--press); }
+    .seg-btn.on:active { background: var(--ink); }
+    .seg-btn:focus-visible { outline: 2px solid var(--orange); outline-offset: -2px; }
+    .pads { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .pad {
+      background: #fff; border: 1px solid var(--hair);
+      border-radius: 4px; padding: 6px;
+    }
+    .xy-head, .xy-val {
+      font-family: var(--mono); font-size: .95rem; line-height: 1.35;
+      color: var(--dim); text-transform: none; letter-spacing: 0;
+      overflow-wrap: anywhere;
+    }
+    .xy-val { text-align: right; }
+    .xy-grid {
+      position: relative; aspect-ratio: 1; margin: 6px 0;
+      border: 1px solid var(--hair);
+      background-color: var(--paper);
+      background-image:
+        repeating-linear-gradient(90deg, var(--hair) 0 1px, transparent 1px 25%),
+        repeating-linear-gradient(0deg, var(--hair) 0 1px, transparent 1px 25%);
+      touch-action: none;
+    }
+    .xy-dot {
+      position: absolute; width: 14px; height: 14px; border-radius: 50%;
+      background: var(--orange); transform: translate(-50%, -50%);
+      box-shadow: 0 0 0 2px var(--paper), 0 1px 3px #00000066;
+    }
   </style>
 </head>
-<body><main>
-  <h1>ProSe live coach</h1>
-  <p class="help">Litigation and debate cues on MemoMind One.</p>
-  <p id="status" role="status">Connecting to MemoMind…</p>
-  <button id="sample" type="button" disabled>Show sample cue</button>
-  <p class="help">Try the green glasses preview with a sample. For live AI cues,
-    start a Live coach session in ProSe and paste its MemoMind stream link below.</p>
-  <form id="connect-form">
-    <label for="session-url">Glasses stream link from your ProSe session</label>
-    <input type="url" id="session-url" required autocomplete="off" spellcheck="false"
-      placeholder="https://your-service/api/copilot/events?session_id=…">
-    <button id="connect" disabled>Connect display</button>
-    <button id="disconnect" type="button" disabled>Disconnect and clear</button>
+<body data-conn="off">
+<main class="shell">
+  <header class="head">
+    <p class="mark">prose<i aria-hidden="true"></i><span>hud link</span></p>
+    <span class="plate">20560 · memomind</span>
+  </header>
+
+  <section class="screen" aria-label="glasses display mirror">
+    <div id="preview" aria-live="polite">standby</div>
+    <div class="statusbar">
+      <i class="led" aria-hidden="true"></i>
+      <p id="status" role="status">connecting to memomind…</p>
+    </div>
+  </section>
+
+  <form id="connect-form" novalidate>
+    <div class="rows">
+      <button type="submit" id="connect" class="row" disabled>
+        <span class="num">01</span>
+        <span class="lbl">connection</span>
+        <span class="row-lbl">connect<i class="dot" aria-hidden="true"></i></span>
+      </button>
+      <button type="button" id="sample" class="row" disabled>
+        <span class="num">02</span>
+        <span class="lbl">sample cue</span>
+        <span class="hint">run&nbsp;→</span>
+      </button>
+      <details class="cfg">
+        <summary class="row">
+          <span class="num">03</span>
+          <span class="lbl">stream</span>
+          <span class="hint">▸</span>
+        </summary>
+        <div class="cfg-body">
+          <input type="url" id="session-url" required autocomplete="off"
+            spellcheck="false" value="http://127.0.0.1:8000/hud/stream"
+            placeholder="http://127.0.0.1:8000/hud/stream">
+          <p class="cfg-note">connects automatically on launch. on a real phone
+            use an https origin — 127.0.0.1 on the phone is the phone itself.</p>
+        </div>
+      </details>
+      <a class="row" id="controller" target="_blank" rel="noopener">
+        <span class="num">04</span>
+        <span class="lbl">controller</span>
+        <span class="hint">open&nbsp;→</span>
+      </a>
+      <details class="cfg" id="matrix">
+        <summary class="row">
+          <span class="num">05</span>
+          <span class="lbl">matrix</span>
+          <span class="hint">▸</span>
+        </summary>
+        <div class="cfg-body pads-cfg">
+          <div class="seg" role="group" aria-label="personality mode">
+            <button type="button" id="tone-debate" class="seg-btn"
+              aria-pressed="true">debate</button>
+            <button type="button" id="tone-litigation" class="seg-btn"
+              aria-pressed="false">litigation</button>
+          </div>
+          <div class="pads">
+            <div class="pad" id="xy-a" data-x="humor" data-y="rhetoric"
+              aria-label="personality axis pad">
+              <p class="xy-head">humor ↔ seriousness × reason ↔ rhetoric</p>
+              <div class="xy-grid"><i class="xy-dot" aria-hidden="true"></i></div>
+              <p class="xy-val">x 2/4 · y 2/4</p>
+            </div>
+            <div class="pad" id="xy-b" data-x="attack" data-y="listening"
+              aria-label="personality axis pad">
+              <p class="xy-head">build ↔ attack × press ↔ listen</p>
+              <div class="xy-grid"><i class="xy-dot" aria-hidden="true"></i></div>
+              <p class="xy-val">x 2/4 · y 2/4</p>
+            </div>
+          </div>
+        </div>
+      </details>
+    </div>
   </form>
-  <div id="preview" aria-live="polite">No suggestion.</div>
-  <p class="help">This plugin relays short cues. Start the session and microphone in the
-    ProSe companion. This version does not capture audio from the glasses.</p>
-  <p class="help">The link grants access to that live stream. Keep it private.
-    Display updates pause when this plugin leaves the foreground.</p>
-  <script type="module" src="./plugin.mjs"></script>
-</main></body></html>
+
+  <p class="fine">preparation aid — not legal advice · link grants read access</p>
+</main>
+<script type="module" src="./plugin.mjs"></script>
+</body>
+</html>

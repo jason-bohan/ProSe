@@ -31,7 +31,6 @@ SUPPORTED = TEXT_TYPES | OFFICE_TYPES | IMAGE_TYPES
 def _ocr_image(image) -> str:
     """Read text locally from a PIL image using RapidOCR/ONNX Runtime."""
     global _OCR_ENGINE
-    from PIL import Image
     import numpy as np
 
     if image.width * image.height > 40_000_000:
@@ -44,7 +43,9 @@ def _ocr_image(image) -> str:
                 from rapidocr import RapidOCR
                 _OCR_ENGINE = RapidOCR()
             except ImportError as exc:
-                raise ValueError("OCR is not installed; install ProSe with the [ocr] extra") from exc
+                raise ValueError(
+                    "OCR is not installed; install ProSe with the [ocr] extra"
+                ) from exc
         result = _OCR_ENGINE(np.asarray(image))
     lines = getattr(result, "txts", None) or []
     return "\n".join(str(line).strip() for line in lines if str(line).strip())
@@ -93,8 +94,8 @@ def case_text(name: str, content: bytes) -> tuple[list[tuple[str, str]], list[st
             warnings.append(f"{empty} PDF page(s) had no readable text, even after OCR.")
     elif suffix in IMAGE_TYPES:
         try:
-            from PIL import Image
             import pillow_heif
+            from PIL import Image
 
             pillow_heif.register_heif_opener()
             image = Image.open(io.BytesIO(content))
@@ -103,7 +104,9 @@ def case_text(name: str, content: bytes) -> tuple[list[tuple[str, str]], list[st
             raise ValueError("Image OCR requires the [ocr] extra") from exc
         sections = [("OCR image text", text)]
         if text.strip():
-            warnings.append("Text extracted from image locally using OCR; verify names and numbers.")
+            warnings.append(
+                "Text extracted from image locally using OCR; verify names and numbers."
+            )
     elif suffix == ".docx":
         with zipfile.ZipFile(io.BytesIO(content)) as doc:
             xml_name = "word/document.xml"

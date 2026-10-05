@@ -1,0 +1,150 @@
+#!/usr/bin/env python3
+"""Converts icons/{happy,neutral,upset,dazed}.png into icons_generated.h.
+
+NOTE: the plugin no longer consumes this header. Faces on the lens are drawn
+at runtime by plugin.c's parametric face_render(), which emits frames in the
+exact layout produced here (64-byte palette + packed 4-bit rows), so this
+tool is kept as the layout reference and as an optional path back to baked
+PNG art: include the header from plugin.c and point an icon descriptor at
+ICON_*_DATA to swap art in without touching the renderer.
+
+Each PNG must be exactly ICON_WIDTH x ICON_HEIGHT with a transparent
+background and opaque foreground pixels (any color -- only alpha and
+luminance are used). Produces the exact GM_PLUGIN_LVGL_IMAGE_INDEXED_4BIT
+byte layout this SDK expects: a 64-byte, 16-entry grayscale palette (index 0
+fully transparent, indices 1-15 a brightness ramp) followed by packed 4-bit
+pixel rows (two pixels per byte, even x in the high nibble), matching
+GlassSDK/examples/image_animation/image_animation.c's build_palette()/
+set_pixel() layout -- but computed here offline instead of at plugin runtime.
+
+If a PNG is missing, a simple placeholder is synthesized with PIL so the
+toolchain can be exercised before real Piskel art exists. Replace the PNG
+and rerun this script at any time.
+
+Run manually from this directory: python tools/png_to_gmp_icon.py
+"""
+from __future__ import annotations
+
+from pathlib import Path
+
+from PIL import Image, ImageDraw
+
+ICON_WIDTH = 32
+ICON_HEIGHT = 24
+ICON_NAMES = ("happy", "neutral", "upset", "dazed")
+
+HERE = Path(__file__).resolve().parent
+ICONS_DIR = HERE.parent / "icons"
+OUTPUT_HEADER = HERE.parent / "icons_generated.h"
+
+
+def _placeholder(name: str) -> Image.Image:
+    img = Image.new("RGBA", (ICON_WIDTH, ICON_HEIGHT), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    white = (255, 255, 255, 255)
+
+    if name == "dazed":
+        draw.line([(5, 4), (12, 11)], fill=white, width=2)
+        draw.line([(5, 11), (12, 4)], fill=white, width=2)
+        draw.line([(20, 4), (27, 11)], fill=white, width=2)
+        draw.line([(20, 11), (27, 4)], fill=white, width=2)
+        draw.ellipse([(14, 16), (18, 21)], fill=white)
+        return img
+
+    draw.rectangle([(6, 6), (11, 11)], fill=white)
+    draw.rectangle([(21, 6), (26, 11)], fill=white)
+    if name == "upset":
+        draw.line([(5, 3), (10, 5)], fill=white, width=2)
+        draw.line([(27, 3), (22, 5)], fill=white, width=2)
+        draw.line([(8, 21), (16, 16), (24, 21)], fill=white, width=3, joint="curve")
+    elif name == "happy":
+        draw.line([(8, 16), (16, 21), (24, 16)], fill=white, width=3, joint="curve")
+    else:  # neutral
+        draw.line([(8, 18), (24, 18)], fill=white, width=3)
+    return img
+
+
+def _load_icon(name: str) -> Image.Image:
+    path = ICONS_DIR / f"{name}.png"
+    if not path.exists():
+        return _placeholder(name)
+    img = Image.open(path).convert("RGBA")
+    if img.size != (ICON_WIDTH, ICON_HEIGHT):
+        raise ValueError(
+            f"{path} must be exactly {ICON_WIDTH}x{ICON_HEIGHT}px, got {img.size[0]}x{img.size[1]}"
+        )
+    return img
+
+
+def _build_palette_bytes() -> bytes:
+    # Index 0 stays all-zero (fully transparent). Indices 1-15 are an
+    # opaque grayscale ramp, same formula as image_animation.c's
+    # build_palette(): brightness = shade * 17.
+    data = bytearray(64)
+    for shade in range(1, 16):
+        brightness = shade * 17
+        offset = shade * 4
+        data[offset] = brightness
+        data[offset + 1] = brightness
+        data[offset + 2] = brightness
+        data[offset + 3] = 255
+    return bytes(data)
+
+
+def _pack_pixels(img: Image.Image) -> bytes:
+    row_bytes = (ICON_WIDTH + 1) // 2
+    data = bytearray(row_bytes * ICON_HEIGHT)
+    pixels = img.load()
+    for y in range(ICON_HEIGHT):
+        for x in range(ICON_WIDTH):
+            r, g, b, a = pixels[x, y]
+            if a < 128:
+                shade = 0
+            else:
+                luma = (r * 299 + g * 587 + b * 114) // 1000
+                shade = max(1, min(15, round(luma / 17)))
+            byte_index = y * row_bytes + x // 2
+            if x % 2 == 0:
+                data[byte_index] = (data[byte_index] & 0x0F) | (shade << 4)
+            else:
+                data[byte_index] = (data[byte_index] & 0xF0) | shade
+    return bytes(data)
+
+
+def _format_c_array(name: str, data: bytes) -> str:
+    # gm_plugin_lvgl_image_dsc_t.data "must start at a 4-byte-aligned
+    # address" per the SDK header; a plain uint8_t array isn't guaranteed
+    # that alignment by default, so this must be explicit (same as
+    # image_animation.c's _Alignas(4) frame buffers).
+    values = ", ".join(f"0x{b:02x}" for b in data)
+    return (
+        f"_Alignas(4) static const uint8_t ICON_{name.upper()}_DATA[{len(data)}] = {{\n"
+        f"    {values}\n"
+        f"}};\n"
+    )
+
+
+def main() -> None:
+    palette = _build_palette_bytes()
+    sections = [
+        "/* Generated by tools/png_to_gmp_icon.py -- do not hand-edit. */",
+        "#ifndef PROSE_ICONS_GENERATED_H",
+        "#define PROSE_ICONS_GENERATED_H",
+        "",
+        f"#define ICON_WIDTH {ICON_WIDTH}",
+        f"#define ICON_HEIGHT {ICON_HEIGHT}",
+        f"#define ICON_DATA_SIZE {64 + ((ICON_WIDTH + 1) // 2) * ICON_HEIGHT}",
+        "",
+    ]
+    for name in ICON_NAMES:
+        img = _load_icon(name)
+        packed = palette + _pack_pixels(img)
+        assert len(packed) == 64 + ((ICON_WIDTH + 1) // 2) * ICON_HEIGHT
+        sections.append(_format_c_array(name, packed))
+    sections.append("#endif /* PROSE_ICONS_GENERATED_H */")
+    OUTPUT_HEADER.write_text("\n".join(sections) + "\n", encoding="utf-8")
+    print(f"Wrote {OUTPUT_HEADER}")
+
+
+if __name__ == "__main__":
+    main()

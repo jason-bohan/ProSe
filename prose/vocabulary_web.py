@@ -4,20 +4,20 @@ from __future__ import annotations
 
 VOCAB_CSS = """
 .vocab-grid{display:grid;grid-template-columns:minmax(270px,.85fr) minmax(0,1.4fr);gap:1.25rem;align-items:start}
-.vocab-grid h2{font-weight:400;font-size:1.25rem;margin:0 0 .8rem}.vocab-grid label{font-weight:400;text-transform:none}
+.vocab-grid h2{font-weight:700;font-size:1.25rem;margin:0 0 .8rem}.vocab-grid label{font-weight:400;text-transform:none}
 .vocab-grid textarea{min-height:75px;font-family:inherit}.vocab-grid input[type=text]{font-family:inherit}
 .vocab-grid [hidden]{display:none!important}.vocab-grid button:disabled{opacity:.4;cursor:default}
 .vocab-grid .btn-row{flex-wrap:wrap}.vocab-grid .pair{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
 .vocab-grid .small{font-size:.85rem;color:var(--g9)}.vocab-grid .word-list{max-height:420px;overflow:auto;margin-top:1rem}
 .word-list button{display:block;text-align:left;width:100%;background:var(--w);color:var(--k);border:0;border-bottom:1px solid var(--g1);padding:.65rem}
-.word-list button.active{background:#edf4fc}.word-list button span{display:block;font-size:.75rem;color:var(--g9)}
-.vocab-grid .review{background:#eff7f4;border-color:#b4cec4}.review h2{font-size:2rem;letter-spacing:-.02em}
+.word-list button.active{background:var(--face);box-shadow:inset 3px 0 0 var(--o)}.word-list button span{display:block;font-size:.75rem;color:var(--g9)}
+.vocab-grid .review{background:var(--paper);border:1px solid var(--k)}.review h2{font-size:2rem;letter-spacing:-.02em}
 .vocab-grid .check{display:flex;align-items:center;gap:.5rem}.vocab-grid fieldset{border:0;padding:0;margin:0;min-width:0}
-.vocab-grid .row{margin-bottom:.8rem}.vocab-grid :focus-visible{outline:2px solid var(--b);outline-offset:3px}
+.vocab-grid .row{margin-bottom:.8rem}.vocab-grid :focus-visible{outline:2px solid var(--o);outline-offset:3px}
 .vocab-grid .definition{font-size:1.1rem}.vocab-grid .word-source{font-size:.78rem;overflow-wrap:anywhere}
 #vocab-notice{min-height:1.6rem}#vocab-notice.error{color:#a21b22}.resource-list li{margin-bottom:.7rem}
-.category-buttons{display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin:.8rem 0}.category-buttons button{font-size:.8rem;background:#edf4fc;color:var(--k);text-align:left;padding:.65rem}.category-buttons button[aria-pressed=true]{background:#c9ded7;outline:2px solid #527967}.library-results{max-height:360px;overflow:auto}.library-results button{display:block;width:100%;text-align:left;margin:.3rem 0;background:#f5f5f5;color:var(--k)}
-.vocab-grid blockquote{border-left:3px solid #b4cec4;padding-left:1rem;margin-left:0;white-space:pre-wrap}
+.category-buttons{display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin:.8rem 0}.category-buttons button{font-size:.8rem;background:var(--w);color:var(--k);text-align:left;padding:.65rem;border:1px solid var(--g1)}.category-buttons button[aria-pressed=true]{background:var(--w);outline:2px solid var(--o)}.library-results{max-height:360px;overflow:auto}.library-results button{display:block;width:100%;text-align:left;margin:.3rem 0;background:var(--w);border:1px solid var(--g1);color:var(--k)}
+.vocab-grid blockquote{border-left:3px solid var(--face2);padding-left:1rem;margin-left:0;white-space:pre-wrap}
 @media(max-width:780px){.vocab-grid{grid-template-columns:1fr}.vocab-grid .pair{grid-template-columns:1fr}.container{padding:1rem}}
 """
 
@@ -222,7 +222,7 @@ VOCAB_JS = r"""
 def render_vocabulary_page(css: str, nav: str) -> str:
     body = """
 <p>Turn words you recognize into words you can use. Learn the meaning, explain it simply, then try it in a real argument.</p>
-<div id="vocab-notice" role="status" aria-live="polite"></div><main class="vocab-grid"><div>
+<div id="vocab-notice" role="status" aria-live="polite"></div><main id="main" class="vocab-grid"><div>
 <section class="card"><h2>Your word notebook</h2><p id="vocab-count" class="small">Loading saved words…</p>
 <p class="small">Browse themed study collections. Category and difficulty filters also choose your recall practice.</p><div id="category-buttons" class="category-buttons" aria-label="Vocabulary categories"></div>
 <div class="btn-row"><button id="new-word" data-lock>New word</button><a href="/practice">Practice in a debate →</a></div>
@@ -272,4 +272,7 @@ def render_vocabulary_page(css: str, nav: str) -> str:
             f'<title>Vocabulary · LexGlasses</title><style>{css}{VOCAB_CSS}</style></head>'
             f'<body><div class="container"><header class="header"><div><h1>Vocabulary builder</h1>'
             f'<div class="badge">Learn it. Explain it. Use it.</div></div>{nav}</header>'
-            f'{body}</div><script>{VOCAB_JS}</script></body></html>')
+            f'{body}'
+            f'<footer>DISCLAIMER: study notes for your own preparation; '
+            f'verify everything against the record. Not legal advice.</footer>'
+            f'</div><script>{VOCAB_JS}</script></body></html>')
