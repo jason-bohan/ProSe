@@ -102,9 +102,13 @@ PRACTICE_JS = r"""
     if (!sel || !sel.value) return null;
     return voices.find(v => v.name === sel.value) || null;
   }
-  speechSynthesis.addEventListener('voiceschanged', loadVoices);
-  loadVoices();
-  loadVoice();
+  function refreshVoices() {
+    loadVoices();
+    populateVoiceDropdown();
+    loadVoice();
+  }
+  speechSynthesis.addEventListener('voiceschanged', refreshVoices);
+  refreshVoices();
   let state = null, session = null, busy = false, ended = false, recognition = null;
   const notice = (text, error=false) => {
     $('practice-status').textContent = text;
@@ -251,8 +255,22 @@ PRACTICE_JS = r"""
     stopAudio();
     const utterance = new SpeechSynthesisUtterance(state.messages[state.messages.length - 1].text);
     utterance.lang = 'en-US';
+    const voice = getSelectedVoice();
+    if (voice) { utterance.voice = voice; utterance.lang = voice.lang; }
     utterance.onerror = event => {
       if (!['interrupted','canceled'].includes(event.error)) notice('Read-aloud unavailable. The reply is shown in the conversation.', true);
+    };
+    speechSynthesis.speak(utterance);
+  }
+  function hearCoach() {
+    if (!canSpeak || !state || !state.coach || !state.coach.suggestion) return;
+    stopAudio();
+    const utterance = new SpeechSynthesisUtterance(state.coach.suggestion);
+    utterance.lang = 'en-US';
+    const voice = getSelectedVoice();
+    if (voice) { utterance.voice = voice; utterance.lang = voice.lang; }
+    utterance.onerror = event => {
+      if (!['interrupted','canceled'].includes(event.error)) notice('Read-aloud unavailable. The suggestion is shown above.', true);
     };
     speechSynthesis.speak(utterance);
   }
@@ -329,7 +347,9 @@ PRACTICE_JS = r"""
     if (!Speech || busy) return;
     stopAudio();
     const r = new Speech(); recognition = r;
-    r.lang = 'en-US'; r.continuous = true; r.interimResults = false;
+    const voice = getSelectedVoice();
+    r.lang = voice && voice.lang ? voice.lang : 'en-US';
+    r.continuous = true; r.interimResults = false;
     r.onresult = event => {
       if (recognition !== r) return;
       const words = [];
@@ -342,6 +362,7 @@ PRACTICE_JS = r"""
     catch (_) { recognition = null; notice('Microphone unavailable. You can type your reply.', true); }
   });
   $('hear-opponent').addEventListener('click', speakOpponent);
+  $('hear-coach').addEventListener('click', hearCoach);
   $('read-aloud').addEventListener('change', () => { if (!$('read-aloud').checked && canSpeak) speechSynthesis.cancel(); });
   $('persona').addEventListener('change', customFields);
   const topics = {
@@ -449,8 +470,9 @@ def render_practice_page(css: str, nav: str, status: dict, documents: list | Non
 aria-label="Debate conversation"><p class="empty">Choose a topic above. Your coach will suggest the first thing to say.</p></div>
 <div class="btn-row"><label class="voice-toggle"><input id="read-aloud" type="checkbox"> Read opponent aloud</label><button type="button" id="hear-opponent" disabled>Hear opponent</button></div>
 <form id="reply-form"><label for="reply">Your reply</label><textarea id="reply" maxlength="4000" required disabled placeholder="Use your coach's suggestion, edit it, or write your own…"></textarea>
-<div class="btn-row"><button id="practice-send" type="submit" disabled>Send reply</button><button id="dictate" type="button" disabled>Dictate reply</button><span class="small">Ctrl / ⌘ + Enter to send</span></div></form>
-<p class="small" id="voice-help">Dictation uses your browser's speech service, which may process audio remotely. Review your words before sending.</p>
+<div class="btn-row"><button id="practice-send" type="submit" disabled>Send reply</button><button id="dictate" type="button" disabled>Dictate reply</button><span class="small">Ctrl / ⌘ + Enter to send</span></div>
+<div class="row"><label for="practice-voice">Voice</label><select id="practice-voice"><option value="">(Browser default)</option></select></div></form>
+<p class="small" id="voice-help">Dictation uses your browser's speech service, which may process audio remotely. Review your words before sending. The voice you pick is used for read-aloud and sets the dictation language.</p>
 <div class="btn-row"><button id="practice-end" type="button" disabled>End practice</button><button id="download-debate" type="button" disabled>Download conversation</button></div></section></div>
 <aside class="card coach-card" aria-label="Private debate coach"><div class="eyebrow">Private coach</div><h2 id="coach-label">Find your next words</h2><p id="coach-model" class="small"></p>
 <blockquote id="suggestion">Your opening suggestion will appear here.</blockquote><button id="use-suggestion" type="button" disabled>Use this suggestion</button><button id="hear-coach" type="button" disabled>Hear coach</button>

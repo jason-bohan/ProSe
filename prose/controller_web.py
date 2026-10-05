@@ -211,9 +211,13 @@ const KEY = 'prose.controller.session';
     if (!sel || !sel.value) return null;
     return voices.find(v => v.name === sel.value) || null;
   }
-  speechSynthesis.addEventListener('voiceschanged', loadVoices);
-  loadVoices();
-  loadVoice();
+  function refreshVoices() {
+    loadVoices();
+    populateVoiceDropdown();
+    loadVoice();
+  }
+  speechSynthesis.addEventListener('voiceschanged', refreshVoices);
+  refreshVoices();
 
 /* V2-lite: every sound is oscillator/noise math generated on the fly --
  * zero audio bytes shipped, the way .kkrieger's synth did it, but tuned to
@@ -230,7 +234,7 @@ function actx() {
     return audioCtx.state === 'running' ? audioCtx : null;
   } catch (_) { return null; }
 }
-function tone(freq, ms, type, peak, delay) {
+function beep(freq, ms, type, peak, delay) {
   const ac = actx(); if (!ac) return;
   const t0 = ac.currentTime + (delay || 0);
   const osc = ac.createOscillator(), gain = ac.createGain();
@@ -256,16 +260,16 @@ function punchNoise(ms, peak) {
   src.start();
 }
 const sfx = {
-  tick() { tone(1320, 30, 'square', 0.04); },
-  blip() { tone(720, 80, 'triangle', 0.07); },
-  thud() { punchNoise(150, 0.22); tone(88, 120, 'sine', 0.18); },
-  crack() { punchNoise(90, 0.14); tone(220, 140, 'sawtooth', 0.06); },
+  tick() { beep(1320, 30, 'square', 0.04); },
+  blip() { beep(720, 80, 'triangle', 0.07); },
+  thud() { punchNoise(150, 0.22); beep(88, 120, 'sine', 0.18); },
+  crack() { punchNoise(90, 0.14); beep(220, 140, 'sawtooth', 0.06); },
   sting() {
-    tone(523, 90, 'triangle', 0.07, 0);
-    tone(659, 90, 'triangle', 0.07, 0.11);
-    tone(784, 150, 'triangle', 0.08, 0.22);
+    beep(523, 90, 'triangle', 0.07, 0);
+    beep(659, 90, 'triangle', 0.07, 0.11);
+    beep(784, 150, 'triangle', 0.08, 0.22);
   },
-  end() { tone(392, 160, 'sine', 0.06); tone(262, 220, 'sine', 0.06, 0.09); },
+  end() { beep(392, 160, 'sine', 0.06); beep(262, 220, 'sine', 0.06, 0.09); },
 };
 
 async function post(path, body) {
@@ -596,9 +600,9 @@ function dictate() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) { toast('Voice dictation is not available here.'); return; }
   if (rec) { rec.stop(); return; }
-  rec = new SR(); rec.lang = 'en-US'; rec.interimResults = true;
+  rec = new SR(); rec.interimResults = true;
   const voice = getSelectedVoice();
-  if (voice) rec.voice = voice;
+  rec.lang = voice && voice.lang ? voice.lang : 'en-US';
   const base = $('draft').value;
   rec.onresult = event => {
     let text = '';
