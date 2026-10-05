@@ -18,7 +18,9 @@ PRACTICE_CSS = """
 .practice-grid :focus-visible{outline:2px solid var(--o);outline-offset:3px}
 .practice-grid .eyebrow{font:700 11px ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase}
 .practice-grid .coach-card{background:var(--k);border-color:var(--k);color:var(--tw);position:sticky;top:1rem}
-.coach-card blockquote{margin:1rem 0;font-size:1.3rem;font-weight:400;line-height:1.5;white-space:pre-wrap}
+.coach-card blockquote{margin:1rem 0;padding:1rem 1.15rem;border:1px solid #555;border-radius:1.15rem;
+ border-bottom-left-radius:.3rem;background:#171719;font-size:1.15rem;font-weight:400;line-height:1.5;
+ white-space:pre-wrap;overflow-wrap:anywhere}
 .coach-card h3{text-transform:none;font-weight:700;margin-top:1.1rem;color:var(--tw)}.coach-card p{white-space:pre-wrap}
 .coach-card .eyebrow{color:var(--o)}
 .coach-card .small{color:#9a9a9a}.coach-card a{color:var(--tw)}
@@ -28,9 +30,10 @@ PRACTICE_CSS = """
 .practice-grid .coach-foot{font-size:.8rem;color:#9a9a9a;border-top:1px solid #2a2a30;padding-top:1rem}
 #practice-status{min-height:1.5rem;margin:.7rem 0;font-size:.9rem}#practice-status.error{color:#a21b22}
 .practice-grid .conversation{max-height:520px;overflow-y:auto;overscroll-behavior:contain;padding-right:.3rem}
-.practice-grid .bubble{padding:1rem;margin:.75rem 0;border:1px solid var(--face2);border-radius:0;background:var(--w)}
-.practice-grid .bubble.opponent{background:var(--face);border-color:var(--g3);margin-right:1.2rem}
-.practice-grid .bubble.you{border-color:var(--k);margin-left:1.2rem}.practice-grid .bubble p{margin:.4rem 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.practice-grid .bubble{width:fit-content;max-width:min(88%,42rem);padding:.8rem 1rem;margin:.75rem 0;
+ border:1px solid var(--face2);border-radius:1.1rem;background:var(--w);box-shadow:0 3px 12px #0000000c}
+.practice-grid .bubble.opponent{background:var(--face);border-color:var(--g3);border-bottom-left-radius:.3rem;margin-right:auto}
+.practice-grid .bubble.you{border-color:var(--k);border-bottom-right-radius:.3rem;margin-left:auto}.practice-grid .bubble p{margin:.4rem 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
 .practice-grid .bubble strong{font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
 .practice-grid .small{font-size:.83rem;color:var(--g9)}.practice-grid .voice-toggle{display:flex;gap:.5rem;align-items:center;font-size:.85rem}
 .practice-grid .topic-button{background:var(--w);color:var(--k);font-size:.78rem;border:1px solid var(--g3);padding:.4rem .65rem}
@@ -435,7 +438,8 @@ def render_practice_page(css: str, nav: str, status: dict, documents: list | Non
 <div id="practice-status" role="status" aria-live="polite">__NOTICE__</div><button type="button" id="reconnect" hidden>Reconnect</button>
 <div class="btn-row"><span id="round-label" class="small">Ready when you are</span><span id="provider" class="small">AI: __MODEL__</span></div></section>
 <section class="card"><h2>The conversation</h2>
-<div id="conversation" class="conversation" role="log" aria-label="Debate conversation"><p class="empty">Choose a topic above. Your coach will suggest the first thing to say.</p></div>
+<div id="conversation" class="conversation" role="log" aria-live="polite" aria-relevant="additions"
+aria-label="Debate conversation"><p class="empty">Choose a topic above. Your coach will suggest the first thing to say.</p></div>
 <div class="btn-row"><label class="voice-toggle"><input id="read-aloud" type="checkbox"> Read opponent aloud</label><button type="button" id="hear-opponent" disabled>Hear opponent</button></div>
 <form id="reply-form"><label for="reply">Your reply</label><textarea id="reply" maxlength="4000" required disabled placeholder="Use your coach's suggestion, edit it, or write your own…"></textarea>
 <div class="btn-row"><button id="practice-send" type="submit" disabled>Send reply</button><button id="dictate" type="button" disabled>Dictate reply</button><span class="small">Ctrl / ⌘ + Enter to send</span></div></form>

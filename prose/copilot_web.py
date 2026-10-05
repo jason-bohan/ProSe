@@ -88,14 +88,21 @@ class CopilotHub:
 COPILOT_CSS = """
 .coach-grid{display:grid;grid-template-columns:minmax(280px,1fr) minmax(300px,1.3fr);gap:1.25rem}
 .coach-grid .card{margin:0 0 1.25rem}.lens{background:var(--k);color:var(--tw);
-min-height:230px;padding:1.5rem;border:1px solid var(--k);border-radius:0}
+min-height:230px;padding:1.5rem;border:1px solid var(--k);border-radius:1.25rem}
 .lens-label{font:12px ui-monospace,monospace;letter-spacing:.1em;color:var(--o)}
-.lens h3{font-size:1.6rem;font-weight:700;line-height:1.3;margin:1.25rem 0;color:var(--tw)}
-.lens p{font-size:.9rem;color:#9a9a9a}.coach-help{font-size:.85rem;color:var(--g9)}
+.lens h3{font-size:1.3rem;font-weight:600;line-height:1.4;margin:1rem 0 .55rem;
+padding:.85rem 1rem;border:1px solid #45454a;border-radius:1rem;border-bottom-left-radius:.25rem;
+background:#171719;color:var(--tw);white-space:pre-wrap;overflow-wrap:anywhere}
+.lens p{font-size:.95rem;line-height:1.5;color:#c7c7cc;white-space:pre-wrap;overflow-wrap:anywhere}
+.coach-help{font-size:.85rem;color:var(--g9)}
 .coach-grid label.check{display:flex;gap:.5rem;align-items:center;text-transform:none}
 .coach-grid button:disabled{opacity:.4;cursor:default}.coach-grid [hidden]{display:none}
-.transcript-log{max-height:300px;overflow:auto;white-space:pre-wrap;font-size:.85rem}
-.transcript-log p{border-bottom:1px solid var(--g1);padding-bottom:.5rem}
+.transcript-log{display:flex;flex-direction:column;gap:.5rem;max-height:300px;overflow:auto;
+padding:.35rem .15rem;font-size:.9rem}
+.transcript-log .turn{width:fit-content;max-width:88%;padding:.65rem .85rem;border:1px solid var(--g1);
+border-radius:1rem;border-bottom-left-radius:.25rem;background:#101812;overflow-wrap:anywhere}
+.transcript-log .turn strong{display:block;margin-bottom:.2rem;color:var(--o);font-size:.72rem;letter-spacing:.04em;text-transform:uppercase}
+.transcript-log .turn p{margin:0;line-height:1.45;white-space:pre-wrap}
 .source-list a{display:block}.coach-grid :focus-visible{outline:2px solid var(--o);outline-offset:3px}
  .coach-grid textarea.short{min-height:85px}.coach-grid .row-pair{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
  .matrix{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
@@ -226,8 +233,13 @@ COPILOT_JS = r"""
     lastSeq = f.seq;
     if (f.turn_id > lastTurn) {
       lastTurn = f.turn_id;
-      const line = document.createElement('p');
-      line.textContent = f.speaker + ': ' + f.transcript;
+      const line = document.createElement('article');
+      line.className = 'turn';
+      const speaker = document.createElement('strong');
+      speaker.textContent = f.speaker;
+      const text = document.createElement('p');
+      text.textContent = f.transcript;
+      line.append(speaker, text);
       $('transcript-log').append(line);
       while ($('transcript-log').children.length > 60) $('transcript-log').firstChild.remove();
       $('transcript-log').scrollTop = $('transcript-log').scrollHeight;
@@ -407,7 +419,8 @@ def render_copilot_page(css: str, nav: str, status: dict, documents: list) -> st
 <div class="row"><label for="utterance">What was said</label><textarea class="short" id="utterance" maxlength="4000" required placeholder="Paste a statement or use the microphone."></textarea></div>
 <div class="btn-row"><button id="send" type="submit" disabled>Send turn</button><button id="mic" type="button" disabled>Start microphone</button></div></form>
 <p class="coach-help" id="mic-help">Microphone transcription uses your browser's speech service and may send audio to its provider. Set the speaker manually. The Vosk CLI supports local transcription.</p>
-<div id="transcript-log" class="transcript-log" aria-label="Recent transcript"></div></section>
+<div id="transcript-log" class="transcript-log" role="log" aria-live="polite"
+aria-relevant="additions" aria-label="Recent transcript"></div></section>
 <section class="card"><h2>Personality matrix <span class="dim" id="tone-mode-label">debate</span></h2>
 <p class="coach-help">Drag a pad: each axis runs from its left/bottom pole to its right/top pole, 0 to 4. Follows the mode in Session brief. Style only: it never changes sourcing or evidentiary rules.</p>
 <fieldset id="tone-controls" disabled style="border:0;padding:0;margin:0">
