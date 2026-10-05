@@ -47,6 +47,61 @@ PRACTICE_JS = r"""
   const canSpeak = 'speechSynthesis' in window;
   const storageKey = 'prose-debate-session';
   const modelKey = 'prose-debate-model';
+  const voiceKey = 'prose-debate-voice';
+  let voices = [];
+  function loadVoices() {
+    try { voices = speechSynthesis.getVoices(); } catch (_) { voices = []; }
+  }
+  function populateVoiceDropdown() {
+    const sel = $('practice-voice');
+    if (!sel || !voices.length) return;
+    const current = sel.value;
+    sel.replaceChildren();
+    const defaultOpt = document.createElement('option');
+    defaultOpt.value = '';
+    defaultOpt.textContent = '(Browser default)';
+    sel.appendChild(defaultOpt);
+    const grouped = {};
+    voices.forEach(v => {
+      const lang = (v.lang || '').split('-')[0].toUpperCase();
+      if (!grouped[lang]) grouped[lang] = [];
+      grouped[lang].push(v);
+    });
+    Object.keys(grouped).sort().forEach(lang => {
+      const g = document.createElement('optgroup');
+      g.label = lang;
+      grouped[lang].forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v.name;
+        opt.textContent = v.name + (v.localService ? ' (local)' : ' (remote)');
+        if (v.name === current) opt.selected = true;
+        g.appendChild(opt);
+      });
+      sel.appendChild(g);
+    });
+  }
+  function rememberVoice() {
+    const sel = $('practice-voice');
+    if (!sel) return;
+    try { localStorage.setItem(voiceKey, sel.value); } catch (_) { /* Optional. */ }
+  }
+  function loadVoice() {
+    try {
+      const saved = localStorage.getItem(voiceKey);
+      if (saved) {
+        const sel = $('practice-voice');
+        if (sel && Array.from(sel.options).some(o => o.value === saved)) sel.value = saved;
+      }
+    } catch (_) { /* Optional. */ }
+  }
+  function getSelectedVoice() {
+    const sel = $('practice-voice');
+    if (!sel || !sel.value) return null;
+    return voices.find(v => v.name === sel.value) || null;
+  }
+  speechSynthesis.addEventListener('voiceschanged', loadVoices);
+  loadVoices();
+  loadVoice();
   let state = null, session = null, busy = false, ended = false, recognition = null;
   const notice = (text, error=false) => {
     $('practice-status').textContent = text;
@@ -73,14 +128,17 @@ PRACTICE_JS = r"""
     return data;
   }
   function controls() {
+    populateVoiceDropdown();
     const active = Boolean(session), finished = ended || Boolean(state && state.complete);
     $('practice-settings').disabled = busy || active;
     $('practice-model').disabled = busy;
+    $('practice-voice').disabled = busy || !canSpeak;
     $('practice-start').disabled = busy || active || $('practice-start').dataset.configured !== 'yes';
     $('practice-end').disabled = busy || !active;
     $('reply').disabled = busy || !active || finished;
     $('practice-send').disabled = busy || !active || finished || !state;
     $('use-suggestion').disabled = busy || !active || finished || !state;
+    $('hear-coach').disabled = busy || !canSpeak || !state || !state.coach || !state.coach.suggestion;
     $('dictate').disabled = busy || !active || finished || !Speech;
     $('hear-opponent').disabled = busy || !canSpeak || !state || !state.messages.length;
     $('read-aloud').disabled = !canSpeak;
@@ -384,7 +442,7 @@ def render_practice_page(css: str, nav: str, status: dict, documents: list | Non
 <p class="small" id="voice-help">Dictation uses your browser's speech service, which may process audio remotely. Review your words before sending.</p>
 <div class="btn-row"><button id="practice-end" type="button" disabled>End practice</button><button id="download-debate" type="button" disabled>Download conversation</button></div></section></div>
 <aside class="card coach-card" aria-label="Private debate coach"><div class="eyebrow">Private coach</div><h2 id="coach-label">Find your next words</h2><p id="coach-model" class="small"></p>
-<blockquote id="suggestion">Your opening suggestion will appear here.</blockquote><button id="use-suggestion" type="button" disabled>Use this suggestion</button>
+<blockquote id="suggestion">Your opening suggestion will appear here.</blockquote><button id="use-suggestion" type="button" disabled>Use this suggestion</button><button id="hear-coach" type="button" disabled>Hear coach</button>
 <p id="coach-why" class="small">You choose what to say. Suggestions go into your reply box for editing.</p>
 <section id="feedback-section" hidden><h3>On your last reply</h3><p id="coach-feedback"></p></section>
 <section id="check-section" hidden><h3>Worth checking</h3><p id="coach-check"></p></section>

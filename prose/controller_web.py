@@ -157,6 +157,61 @@ let toneMode = 'debate';
 let toneTimer = null;
 let busy = false, rec = null, poll = null, lastTurn = -1, soundTurn = -1;
 const KEY = 'prose.controller.session';
+  const voiceKey = 'prose-hud-voice';
+  let voices = [];
+  function loadVoices() {
+    try { voices = speechSynthesis.getVoices(); } catch (_) { voices = []; }
+  }
+  function populateVoiceDropdown() {
+    const sel = $('hud-voice');
+    if (!sel || !voices.length) return;
+    const current = sel.value;
+    sel.replaceChildren();
+    const defaultOpt = document.createElement('option');
+    defaultOpt.value = '';
+    defaultOpt.textContent = '(Browser default)';
+    sel.appendChild(defaultOpt);
+    const grouped = {};
+    voices.forEach(v => {
+      const lang = (v.lang || '').split('-')[0].toUpperCase();
+      if (!grouped[lang]) grouped[lang] = [];
+      grouped[lang].push(v);
+    });
+    Object.keys(grouped).sort().forEach(lang => {
+      const g = document.createElement('optgroup');
+      g.label = lang;
+      grouped[lang].forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v.name;
+        opt.textContent = v.name + (v.localService ? ' (local)' : ' (remote)');
+        if (v.name === current) opt.selected = true;
+        g.appendChild(opt);
+      });
+      sel.appendChild(g);
+    });
+  }
+  function rememberVoice() {
+    const sel = $('hud-voice');
+    if (!sel) return;
+    try { localStorage.setItem(voiceKey, sel.value); } catch (_) { /* Optional. */ }
+  }
+  function loadVoice() {
+    try {
+      const saved = localStorage.getItem(voiceKey);
+      if (saved) {
+        const sel = $('hud-voice');
+        if (sel && Array.from(sel.options).some(o => o.value === saved)) sel.value = saved;
+      }
+    } catch (_) { /* Optional. */ }
+  }
+  function getSelectedVoice() {
+    const sel = $('hud-voice');
+    if (!sel || !sel.value) return null;
+    return voices.find(v => v.name === sel.value) || null;
+  }
+  speechSynthesis.addEventListener('voiceschanged', loadVoices);
+  loadVoices();
+  loadVoice();
 
 /* V2-lite: every sound is oscillator/noise math generated on the fly --
  * zero audio bytes shipped, the way .kkrieger's synth did it, but tuned to
@@ -228,6 +283,8 @@ function show(next) {
   for (const name of ['menu', 'setup', 'fight', 'tone'])
     $('view-' + name).hidden = name !== next;
   padState();
+  $('hud-voice').addEventListener('change', rememberVoice);
+  populateVoiceDropdown();
 }
 function toast(text, ms = 1600) {
   const el = $('toast'); el.textContent = text; el.hidden = false;
@@ -453,6 +510,7 @@ function renderFight(next, immediate) {
   $('voc-fb').textContent = coach.vocabulary_feedback || '';
   $('voc-fb').hidden = !coach.vocabulary_feedback;
   $('use-suggestion').disabled = busy || !coach.suggestion;
+  $('hear-coach-btn').disabled = busy || !coach.suggestion || !window.speechSynthesis;
   padState();
 }
 function setMeter(pct, hit) {
@@ -492,6 +550,15 @@ function sendReply() {
     .catch(error => { if (error.status !== 409) toast(error.message); })
     .finally(() => { busy = false; thinking(false); padState(); });
 }
+function hearCoach() {
+  if (!state || !state.coach || !state.coach.suggestion || !window.speechSynthesis) return;
+  speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(state.coach.suggestion);
+  utter.rate = 1.02;
+  const voice = getSelectedVoice();
+  if (voice) utter.voice = voice;
+  speechSynthesis.speak(utter);
+}
 function useSuggestion() {
   if (!state || !state.coach || !state.coach.suggestion) return;
   $('draft').value = state.coach.suggestion;
@@ -505,13 +572,18 @@ function hearOpponent() {
   if (!last) return;
   speechSynthesis.cancel();
   const utter = new SpeechSynthesisUtterance(last.text);
-  utter.rate = 1.02; speechSynthesis.speak(utter);
+  utter.rate = 1.02;
+  const voice = getSelectedVoice();
+  if (voice) utter.voice = voice;
+  speechSynthesis.speak(utter);
 }
 function dictate() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) { toast('Voice dictation is not available here.'); return; }
   if (rec) { rec.stop(); return; }
   rec = new SR(); rec.lang = 'en-US'; rec.interimResults = true;
+  const voice = getSelectedVoice();
+  if (voice) rec.voice = voice;
   const base = $('draft').value;
   rec.onresult = event => {
     let text = '';
@@ -587,6 +659,7 @@ document.addEventListener('DOMContentLoaded', () => {
   bindPad('xy-b');
   $('send-btn').addEventListener('click', sendReply);
   $('use-suggestion').addEventListener('click', useSuggestion);
+  $('hear-coach-btn').addEventListener('click', hearCoach);
   $('hear-btn').addEventListener('click', hearOpponent);
   $('dictate-btn').addEventListener('click', dictate);
   $('end-btn').addEventListener('click', backToMenu);
@@ -672,6 +745,10 @@ def render_controller_page(
         "<label>Jurisdiction<input id=\"f-jurisdiction\" value=\"Unspecified\" "
         "maxlength=\"160\"></label>"
         "<label>AI model<select id=\"f-model\">" + models + "</select></label>"
+        "<label>Voice<select id=\"hud-voice\"><option value=\"\">"
+        "(Browser default)</option></select></label><p class=\"small\">"
+        "Select a voice for dictation and read-aloud. Changes apply to "
+        "the next session.</p>"
         "<label class=\"toggle\"><input type=\"checkbox\" id=\"f-legal\">"
         "Legal review with the specialist</label>"
         "<label class=\"toggle\"><input type=\"checkbox\" id=\"f-context\">"
@@ -722,6 +799,7 @@ def render_controller_page(
         "<p id=\"voc-fb\" hidden></p>"
         "<div class=\"btn-row\">"
         "<button type=\"button\" class=\"ghost\" id=\"use-suggestion\">Use suggestion</button>"
+        "<button type=\"button\" class=\"ghost\" id=\"hear-coach-btn\">Hear coach</button>"
         "<button type=\"button\" class=\"ghost\" id=\"hear-btn\">Hear opponent</button>"
         "<button type=\"button\" class=\"ghost\" id=\"dictate-btn\">Dictate</button>"
         "</div></div>"

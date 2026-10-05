@@ -37,6 +37,8 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 "prose/debate_web.py" = ["E501"]
 "prose/vocabulary_web.py" = ["E501"]
 "prose/research_web.py" = ["E501"]
+# one-shot migration scripts embed whole HTML/JS payload lines
+"scripts/*.py" = ["E501"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
