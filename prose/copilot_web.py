@@ -147,8 +147,11 @@ COPILOT_JS = r"""
   async function api(path, data) {
     const response = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json'},
       body:JSON.stringify(data)});
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || 'Request failed');
+    let result;
+    try { result = await response.json(); } catch (_) { result = null; }
+    if (!response.ok) throw new Error(result && result.error ||
+      'Live coach request failed (HTTP ' + response.status + ').');
+    if (!result || typeof result !== 'object') throw new Error('Live coach returned an invalid response.');
     return result;
   }
   function renderTone() {
@@ -301,7 +304,11 @@ COPILOT_JS = r"""
       renderTone();
       const expected = session;
       stream = new EventSource('/api/copilot/events?session_id=' + encodeURIComponent(session));
-      stream.addEventListener('frame', event => { if (session === expected) frame(JSON.parse(event.data)); });
+      stream.addEventListener('frame', event => {
+        if (session !== expected) return;
+        try { frame(JSON.parse(event.data)); }
+        catch (_) { notice('Received an unreadable live update. Reconnecting…'); }
+      });
       stream.addEventListener('stopped', () => { if (session === expected) stopSession(); });
       stream.onopen = () => { if (session === expected) notice(''); };
       stream.onerror = () => { if (session === expected) { clearCue('Connection interrupted.'); notice('Reconnecting to the live session…'); } };

@@ -509,7 +509,8 @@ function connectHud() {
   var es = new EventSource("/hud/stream");
   var box = document.getElementById("hud");
   es.addEventListener("frame", function (e) {
-    var f = JSON.parse(e.data);
+    var f;
+    try { f = JSON.parse(e.data); } catch (_) { return; }
     var div = document.createElement("div");
     div.innerHTML = '<span class="seq">#' + f.seq + '</span> ' +
       '<span class="spk">' + htmlEscape(f.speaker) + ':</span> ' +

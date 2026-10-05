@@ -273,11 +273,24 @@ async function post(path, body) {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify(body || {})
   });
-  const data = await res.json().catch(() => ({}));
+  let data; try { data = await res.json(); } catch (_) { data = null; }
   if (!res.ok) {
-    const err = new Error(data.error || 'Request failed.');
+    const message = (data && data.error) || 'Controller request failed (HTTP ' +
+      res.status + ').';
+    const err = new Error(message);
     err.status = res.status; throw err;
   }
+  if (!data || typeof data !== 'object')
+    throw new Error('Controller returned an invalid response.');
+  return data;
+}
+async function getMenu() {
+  const response = await fetch('/api/hud/menu');
+  let data; try { data = await response.json(); } catch (_) { data = null; }
+  if (!response.ok)
+    throw new Error('Could not load the controller menu (HTTP ' + response.status + ').');
+  if (!data || typeof data !== 'object')
+    throw new Error('Controller returned an invalid menu.');
   return data;
 }
 function show(next) {
@@ -298,7 +311,7 @@ function remember(value) {
 }
 async function loadMenu() {
   try {
-    const snap = await (await fetch('/api/hud/menu')).json();
+    const snap = await getMenu();
     modes = snap.modes || []; index = snap.index || 0; mode = snap.mode || '';
     adoptTone(snap);
     renderMenu();

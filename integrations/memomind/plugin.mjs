@@ -228,7 +228,12 @@ async function matrixFetch(body) {
     body: JSON.stringify(body),
   } : undefined);
   if (!response.ok) throw new Error('Controller unreachable (' + response.status + ')');
-  adoptMatrix(await response.json());
+  let snapshot;
+  try { snapshot = await response.json(); }
+  catch (_) { throw new Error('Controller returned an unreadable menu.'); }
+  if (!snapshot || typeof snapshot !== 'object')
+    throw new Error('Controller returned an invalid menu.');
+  adoptMatrix(snapshot);
 }
 function scheduleMatrixSync() {
   clearTimeout(toneTimer);
