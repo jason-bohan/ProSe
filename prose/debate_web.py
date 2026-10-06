@@ -50,7 +50,7 @@ PRACTICE_JS = r"""
   const canSpeak = 'speechSynthesis' in window;
   const storageKey = 'prose-debate-session';
   const modelKey = 'prose-debate-model';
-  const voiceKey = 'prose-debate-voice';
+  const voiceKey = 'prose-voice';
   let voices = [];
   function loadVoices() {
     try { voices = speechSynthesis.getVoices(); } catch (_) { voices = []; }
@@ -90,7 +90,8 @@ PRACTICE_JS = r"""
   }
   function loadVoice() {
     try {
-      const saved = localStorage.getItem(voiceKey);
+      const saved = localStorage.getItem(voiceKey)
+        || localStorage.getItem('prose-debate-voice');
       if (saved) {
         const sel = $('practice-voice');
         if (sel && Array.from(sel.options).some(o => o.value === saved)) sel.value = saved;

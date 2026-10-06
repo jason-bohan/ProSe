@@ -159,7 +159,7 @@ let toneMode = 'debate';
 let toneTimer = null;
 let busy = false, rec = null, poll = null, lastTurn = -1, soundTurn = -1;
 const KEY = 'prose.controller.session';
-  const voiceKey = 'prose-hud-voice';
+  const voiceKey = 'prose-voice';
   let voices = [];
   function loadVoices() {
     try { voices = speechSynthesis.getVoices(); } catch (_) { voices = []; }
@@ -199,7 +199,8 @@ const KEY = 'prose.controller.session';
   }
   function loadVoice() {
     try {
-      const saved = localStorage.getItem(voiceKey);
+      const saved = localStorage.getItem(voiceKey)
+        || localStorage.getItem('prose-hud-voice');
       if (saved) {
         const sel = $('hud-voice');
         if (sel && Array.from(sel.options).some(o => o.value === saved)) sel.value = saved;

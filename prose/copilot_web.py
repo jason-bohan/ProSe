@@ -154,6 +154,86 @@ COPILOT_JS = r"""
     if (!result || typeof result !== 'object') throw new Error('Live coach returned an invalid response.');
     return result;
   }
+  const voiceKey = 'prose-voice';
+  const legacyVoiceKeys = ['prose-hud-voice', 'prose-debate-voice'];
+  let voices = [];
+  let lastCue = '';
+  function loadVoices() {
+    try { voices = speechSynthesis.getVoices(); } catch (_) { voices = []; }
+  }
+  function populateVoiceDropdown() {
+    const sel = $('copilot-voice');
+    if (!sel || !voices.length) return;
+    const current = sel.value;
+    sel.replaceChildren();
+    const defaultOpt = document.createElement('option');
+    defaultOpt.value = '';
+    defaultOpt.textContent = '(Browser default)';
+    sel.appendChild(defaultOpt);
+    const grouped = {};
+    voices.forEach(v => {
+      const lang = (v.lang || '').split('-')[0].toUpperCase();
+      if (!grouped[lang]) grouped[lang] = [];
+      grouped[lang].push(v);
+    });
+    Object.keys(grouped).sort().forEach(lang => {
+      const g = document.createElement('optgroup');
+      g.label = lang;
+      grouped[lang].forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v.name;
+        opt.textContent = v.name + (v.localService ? ' (local)' : ' (remote)');
+        if (v.name === current) opt.selected = true;
+        g.appendChild(opt);
+      });
+      sel.appendChild(g);
+    });
+  }
+  function rememberVoice() {
+    const sel = $('copilot-voice');
+    if (!sel) return;
+    try { localStorage.setItem(voiceKey, sel.value); } catch (_) { /* Optional. */ }
+  }
+  function loadVoice() {
+    try {
+      const saved = localStorage.getItem(voiceKey)
+        || legacyVoiceKeys.map(key => localStorage.getItem(key)).find(Boolean);
+      if (saved) {
+        const sel = $('copilot-voice');
+        if (sel && Array.from(sel.options).some(o => o.value === saved)) sel.value = saved;
+      }
+    } catch (_) { /* Optional. */ }
+  }
+  function getSelectedVoice() {
+    const sel = $('copilot-voice');
+    if (!sel || !sel.value) return null;
+    return voices.find(v => v.name === sel.value) || null;
+  }
+  function refreshVoices() {
+    loadVoices();
+    populateVoiceDropdown();
+    loadVoice();
+  }
+  if ('speechSynthesis' in window) {
+    speechSynthesis.addEventListener('voiceschanged', refreshVoices);
+    refreshVoices();
+  }
+  $('copilot-voice').addEventListener('change', rememberVoice);
+  function hearCue() {
+    if (!('speechSynthesis' in window) || !lastCue) return;
+    speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(lastCue);
+    utterance.lang = 'en-US';
+    const voice = getSelectedVoice();
+    if (voice) { utterance.voice = voice; utterance.lang = voice.lang; }
+    utterance.onerror = event => {
+      if (!['interrupted', 'canceled'].includes(event.error)) {
+        notice('Read-aloud unavailable. The cue is shown in the glasses preview.');
+      }
+    };
+    speechSynthesis.speak(utterance);
+  }
+  $('hear-cue').addEventListener('click', hearCue);
   function renderTone() {
     const traits = TRAITS[toneMode];
     const values = tone[toneMode];
@@ -223,6 +303,8 @@ COPILOT_JS = r"""
   }
   function clearCue(text) {
     clearTimeout(expiry);
+    lastCue = '';
+    $('hear-cue').disabled = true;
     $('cue-kind').textContent = 'LISTENING'; $('cue').textContent = text;
     $('say').textContent = ''; $('rationale').textContent = '';
     $('question').textContent = ''; $('caveat').textContent = '';
@@ -272,6 +354,8 @@ COPILOT_JS = r"""
     $('rationale').textContent = f.cue.rationale;
     $('question').textContent = f.cue.next_question ? 'Ask next: ' + f.cue.next_question : '';
     $('caveat').textContent = f.cue.caveat;
+    lastCue = f.cue.say || f.cue.headline || '';
+    $('hear-cue').disabled = !lastCue;
     for (const source of f.cue.sources) {
       const item = document.createElement(source.url ? 'a' : 'span');
       item.textContent = source.title;
@@ -350,7 +434,9 @@ COPILOT_JS = r"""
     if (recognition) { stopMic(); return; }
     if (!Speech || !session) return;
     const expected = session, rec = new Speech(); recognition = rec;
-    rec.continuous = true; rec.interimResults = false; rec.lang = 'en-US';
+    rec.continuous = true; rec.interimResults = false;
+    const voice = getSelectedVoice();
+    rec.lang = voice && voice.lang ? voice.lang : 'en-US';
     rec.onresult = event => {
       for (let i=event.resultIndex; i<event.results.length; i++) {
         if (event.results[i].isFinal && session === expected) {
@@ -424,8 +510,9 @@ def render_copilot_page(css: str, nav: str, status: dict, documents: list) -> st
 </section><section class="card"><h2>Live transcript</h2>
 <form id="turn-form"><div class="row"><label for="speaker">Current speaker</label><input id="speaker" type="text" value="Other speaker" maxlength="100" required></div>
 <div class="row"><label for="utterance">What was said</label><textarea class="short" id="utterance" maxlength="4000" required placeholder="Paste a statement or use the microphone."></textarea></div>
+<div class="row"><label for="copilot-voice">Voice</label><select id="copilot-voice"><option value="">(Browser default)</option></select></div>
 <div class="btn-row"><button id="send" type="submit" disabled>Send turn</button><button id="mic" type="button" disabled>Start microphone</button></div></form>
-<p class="coach-help" id="mic-help">Microphone transcription uses your browser's speech service and may send audio to its provider. Set the speaker manually. The Vosk CLI supports local transcription.</p>
+<p class="coach-help" id="mic-help">Microphone transcription uses your browser's speech service and may send audio to its provider. Set the speaker manually. The voice you pick sets the dictation language and is used by Hear cue. The Vosk CLI supports local transcription.</p>
 <div id="transcript-log" class="transcript-log" role="log" aria-live="polite"
 aria-relevant="additions" aria-label="Recent transcript"></div></section>
 <section class="card"><h2>Personality matrix <span class="dim" id="tone-mode-label">debate</span></h2>
@@ -447,6 +534,7 @@ aria-relevant="additions" aria-label="Recent transcript"></div></section>
 <div><section class="card"><h2>Glasses preview <span class="dim" id="latency"></span></h2>
 <div class="lens" role="status" aria-live="polite"><div class="lens-label" id="cue-kind">STANDBY</div><h3 id="cue">Listen. Think. Respond.</h3><p id="say"></p></div>
 <p class="coach-help">One suggested cue at a time. New speech clears the previous cue; slow responses are discarded.</p>
+<div class="btn-row"><button type="button" id="hear-cue" disabled>Hear cue</button></div>
 <p id="notice" role="status" aria-live="polite"></p></section>
 <section class="card"><h2>Companion notes</h2><p id="rationale"></p><p id="question"></p><p id="caveat" class="coach-help"></p><div id="sources" class="source-list"></div>
 <p class="coach-help">Suggestions use your recent conversation and selected sources. Source links identify supplied material; they do not certify the model's interpretation.</p></section>

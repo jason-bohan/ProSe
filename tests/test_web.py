@@ -14,8 +14,6 @@ from datetime import date
 
 import pytest
 
-import prose.controller_web as controller_web
-import prose.debate_web as debate_web
 import prose.web as web
 from prose import NOT_LEGAL_ADVICE
 from prose.crawler import Violation
@@ -408,33 +406,41 @@ def test_page_shell_consistency() -> None:
 
 
 def test_voice_controls_are_wired() -> None:
-    """Voice selects exist in the DOM, refresh when the browser finishes
-    loading voices, and the chosen voice reaches every speech call."""
-    pages = {}
+    """Voice selects exist in every speech-capable page, share one persisted
+    key, and the chosen voice reaches synthesis and dictation."""
+    pages = ("/", "/copilot", "/practice", "/documents", "/live",
+             "/exports", "/vocabulary", "/research", "/suits", "/controller")
+    body_by_path, scripts_by_path = {}, {}
     with _site() as site:
-        for path in ("/practice", "/controller"):
+        for path in pages:
             with urllib.request.urlopen(site.url + path, timeout=30) as resp:
-                pages[path] = resp.read().decode("utf-8")
-    practice, controller = pages["/practice"], pages["/controller"]
-    assert 'id="practice-voice"' in practice
-    assert 'id="hud-voice"' in controller
+                body = resp.read().decode("utf-8")
+            body_by_path[path] = body
+            scripts_by_path[path] = "\n".join(
+                re.findall(r"<script>(.*?)</script>", body, re.S))
     # Every element the scripts reach for must exist in the served page,
     # or the handler that touches it dies with a TypeError.
-    for page, script in ((practice, debate_web.PRACTICE_JS),
-                         (controller, controller_web.CONTROLLER_JS)):
-        wanted = set(re.findall(r"\$\('([^']+)'\)", script))
-        present = set(re.findall(r'id="([^"]+)"', page))
-        assert wanted <= present, sorted(wanted - present)
-    for script in (debate_web.PRACTICE_JS, controller_web.CONTROLLER_JS):
-        assert "voiceschanged', refreshVoices" in script
-    assert "utterance.voice = voice" in debate_web.PRACTICE_JS
-    assert "utter.voice = voice" in controller_web.CONTROLLER_JS
-    assert "'hear-coach').addEventListener('click'" in debate_web.PRACTICE_JS
-    # Dictation follows the picked voice's language; SpeechRecognition
-    # has no .voice property, so the language tag is the real channel.
-    assert "rec.voice" not in controller_web.CONTROLLER_JS
-    assert "voice.lang : 'en-US'" in controller_web.CONTROLLER_JS
-    assert "voice.lang : 'en-US'" in debate_web.PRACTICE_JS
+    for path in pages:
+        wanted = set(re.findall(r"\$\('([^']+)'\)", scripts_by_path[path]))
+        present = set(re.findall(r'id="([^"]+)"', body_by_path[path]))
+        assert wanted <= present, f"{path}: {sorted(wanted - present)}"
+    assert 'id="practice-voice"' in body_by_path["/practice"]
+    assert 'id="hud-voice"' in body_by_path["/controller"]
+    assert 'id="copilot-voice"' in body_by_path["/copilot"]
+    # One persisted voice key everywhere; legacy keys still load as fallback.
+    for path in ("/controller", "/practice", "/copilot", "/vocabulary"):
+        assert "prose-voice" in scripts_by_path[path], path
+    for path in ("/controller", "/practice", "/copilot"):
+        script = scripts_by_path[path]
+        assert "voiceschanged', refreshVoices" in script, path
+        assert ".voice = voice" in script, path
+        assert "voice.lang : 'en-US'" in script, path
+    assert "'hear-coach').addEventListener('click'" in scripts_by_path["/practice"]
+    assert "'hear-cue').addEventListener('click'" in scripts_by_path["/copilot"]
+    assert "speech.voice" in scripts_by_path["/vocabulary"]
+    # SpeechRecognition has no .voice property; language is the real channel.
+    for path in ("/controller", "/copilot"):
+        assert "rec.voice" not in scripts_by_path[path], path
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node not on PATH")
