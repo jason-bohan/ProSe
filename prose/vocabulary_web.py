@@ -182,7 +182,10 @@ VOCAB_JS = r"""
   });
   $('say-word').onclick=()=>{
     if(!review || !('speechSynthesis' in window)) {notice('Speech playback is unavailable in this browser.',true);return;}
-    speechSynthesis.cancel(); const speech=new SpeechSynthesisUtterance(review.word);speech.lang='en-US';speechSynthesis.speak(speech);
+    speechSynthesis.cancel(); const speech=new SpeechSynthesisUtterance(review.word);speech.lang='en-US';
+    let name='';try{name=localStorage.getItem('prose-voice')||localStorage.getItem('prose-hud-voice')||'';}catch(_){}
+    if(name){const v=speechSynthesis.getVoices().find(x=>x.name===name);if(v){speech.voice=v;speech.lang=v.lang;}}
+    speechSynthesis.speak(speech);
   };
   $('import-file').onchange=()=>action(async()=>{
     const file=$('import-file').files[0];if(!file)return;
